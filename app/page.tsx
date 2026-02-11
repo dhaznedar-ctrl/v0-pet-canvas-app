@@ -901,8 +901,10 @@ function HomePageContent() {
             <h1 className="font-serif text-2xl sm:text-4xl md:text-5xl italic text-foreground leading-[1.1] sm:leading-[1.15] mb-2 sm:mb-4 tracking-tight">
               {generatedImage && appState === 'preview' ? (
                 <span className="block">Your Masterpiece is Ready!</span>
-              ) : appState === 'checkout' || appState === 'payment_success' ? (
+              ) : appState === 'checkout' ? (
                 <span className="block">Complete Your Order</span>
+              ) : appState === 'payment_success' ? (
+                <span className="block">Payment Successful!</span>
               ) : appState === 'rate_limited' ? (
                 <span className="block">Daily Limit Reached</span>
               ) : (
@@ -966,6 +968,41 @@ function HomePageContent() {
 
           {/* Checkout Flow */}
           {renderCheckoutFlow()}
+
+          {/* Payment Success State */}
+          {appState === 'payment_success' && (
+            <div className="mb-6">
+              <div className="w-full max-w-md mx-auto">
+                <div className="rounded-xl border border-primary/30 bg-primary/5 p-6 sm:p-8 text-center">
+                  <div className="flex justify-center mb-4">
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-primary/10 flex items-center justify-center">
+                      <ChevronRight className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
+                    </div>
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-2">
+                    Your Masterpiece is Yours!
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Payment completed successfully. Your high-resolution portrait is ready.
+                  </p>
+                  {currentOrder?.email && !currentOrder.email.startsWith('guest-') && (
+                    <p className="text-xs text-muted-foreground mb-4">
+                      A download link has also been sent to {currentOrder.email}.
+                    </p>
+                  )}
+                  <button
+                    onClick={() => {
+                      setCurrentOrder(null)
+                      setAppState(generatedImage ? 'preview' : 'upload')
+                    }}
+                    className="w-full inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
+                    View Your Portrait
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Upload Card / Generated Result - hide during checkout/error */}
           {appState !== 'checkout' && appState !== 'payment_success' && !['upload_failed', 'generate_failed', 'payment_failed', 'rate_limited'].includes(appState) && (
