@@ -39,8 +39,8 @@ export default function SupportPage() {
                 <p className="text-muted-foreground mb-4">
                   Send us an email and we will get back to you within 24 hours.
                 </p>
-                <a href="mailto:support@petcanvas.art" className="text-primary hover:underline font-medium">
-                  support@petcanvas.art
+                <a href="mailto:info@petcanvas.art" className="text-primary hover:underline font-medium">
+                  info@petcanvas.art
                 </a>
               </CardContent>
             </Card>

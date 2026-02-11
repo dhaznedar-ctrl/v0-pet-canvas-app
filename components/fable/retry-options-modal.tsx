@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, RefreshCw, Upload, Pencil } from 'lucide-react'
+import { RefreshCw, Upload, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
@@ -11,156 +11,140 @@ interface RetryOptionsModalProps {
   onOpenChange: (open: boolean) => void
   onRetry: () => void
   onUploadNew: () => void
-  onEditMasculine: () => void
-  onEditFeminine: () => void
   onCustomEdit: (description: string) => void
   remainingActions?: number
 }
+
+const QUICK_SUGGESTIONS = [
+  'Make it more royal',
+  'Add a crown',
+  'Change the background',
+  'More dramatic lighting',
+  'Add gold accents',
+]
 
 export function RetryOptionsModal({
   open,
   onOpenChange,
   onRetry,
   onUploadNew,
-  onEditMasculine,
-  onEditFeminine,
   onCustomEdit,
-  remainingActions = 5,
+  remainingActions = 2,
 }: RetryOptionsModalProps) {
   const [customDescription, setCustomDescription] = useState('')
-  const [showCustomEdit, setShowCustomEdit] = useState(false)
 
   const handleCustomSubmit = () => {
     if (customDescription.trim()) {
       onCustomEdit(customDescription)
       setCustomDescription('')
-      setShowCustomEdit(false)
       onOpenChange(false)
     }
   }
 
+  const handleSuggestionClick = (suggestion: string) => {
+    setCustomDescription((prev) => {
+      if (prev.trim()) return `${prev}, ${suggestion.toLowerCase()}`
+      return suggestion
+    })
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[92vw] max-w-[340px] sm:max-w-md bg-card border-border p-3 sm:p-6 overflow-hidden">
-        <DialogHeader className="text-left">
-          <DialogTitle className="text-base sm:text-xl font-semibold text-foreground">Retry Options</DialogTitle>
-          <p className="text-[11px] sm:text-sm text-muted-foreground">
-            {remainingActions} remaining · Each action uses 1
-          </p>
-        </DialogHeader>
+      <DialogContent className="w-[92vw] max-w-[420px] sm:max-w-lg bg-card border-border p-4 sm:p-6 overflow-hidden">
+        {/* Top actions: Retry + Upload New */}
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <Button
+            onClick={() => {
+              onRetry()
+              onOpenChange(false)
+            }}
+            className="flex items-center gap-1.5 h-auto py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground text-xs sm:text-sm"
+          >
+            <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <span>Retry</span>
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              onUploadNew()
+              onOpenChange(false)
+            }}
+            className="flex items-center gap-1.5 h-auto py-2.5 bg-secondary hover:bg-secondary/80 text-xs sm:text-sm"
+          >
+            <Upload className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <span>Upload New</span>
+          </Button>
+        </div>
 
-        <div className="space-y-2.5 sm:space-y-4 pt-2 sm:pt-4">
-          {/* Main Actions */}
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              onClick={() => {
-                onRetry()
-                onOpenChange(false)
-              }}
-              className="flex flex-col items-center gap-1 sm:gap-2 h-auto py-2.5 sm:py-4 bg-primary hover:bg-primary/90 text-primary-foreground"
-            >
-              <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5" />
-              <span className="font-medium text-xs sm:text-base">Retry</span>
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                onUploadNew()
-                onOpenChange(false)
-              }}
-              className="flex flex-col items-center gap-0.5 sm:gap-2 h-auto py-2.5 sm:py-4 bg-secondary hover:bg-secondary/80"
-            >
-              <Upload className="h-4 w-4 sm:h-5 sm:w-5" />
-              <div className="text-center">
-                <span className="font-medium text-xs sm:text-base block">Upload New</span>
-                <span className="text-[9px] sm:text-xs text-muted-foreground">Best for likeness</span>
-              </div>
-            </Button>
+        {/* Divider */}
+        <div className="relative py-2">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-border" />
+          </div>
+          <div className="relative flex justify-center">
+            <span className="bg-card px-2 text-[10px] sm:text-sm text-muted-foreground">or make edits</span>
+          </div>
+        </div>
+
+        {/* Edit Your Masterpiece Section */}
+        <div className="pt-1">
+          <DialogHeader className="text-left mb-3">
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg font-semibold text-foreground">
+              <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+              Edit Your Masterpiece
+            </DialogTitle>
+            <p className="text-[11px] sm:text-sm text-muted-foreground mt-1">
+              Describe what changes you&apos;d like to make to your portrait. Our AI will regenerate it with your instructions.
+            </p>
+            <p className="text-[11px] sm:text-sm text-primary font-medium mt-1">
+              {remainingActions} {remainingActions === 1 ? 'edit' : 'edits'} remaining
+            </p>
+          </DialogHeader>
+
+          {/* Instructions textarea */}
+          <div className="mb-3">
+            <p className="text-xs sm:text-sm font-medium text-foreground mb-1.5">Your Instructions</p>
+            <Textarea
+              placeholder="E.g., Make the background darker, add more gold details, change the pose..."
+              value={customDescription}
+              onChange={(e) => setCustomDescription(e.target.value)}
+              className="min-h-20 sm:min-h-28 bg-background border-primary/30 focus:border-primary text-xs sm:text-sm resize-none"
+            />
           </div>
 
-          {/* Divider */}
-          <div className="relative py-1 sm:py-2">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-border" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-card px-2 text-[10px] sm:text-sm text-muted-foreground">or make edits</span>
-            </div>
-          </div>
-
-          {/* Edit Options */}
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                onEditMasculine()
-                onOpenChange(false)
-              }}
-              className="flex flex-col items-center gap-1 sm:gap-2 h-auto py-2.5 sm:py-4 border-border bg-transparent"
-            >
-              <svg className="h-4 w-4 sm:h-5 sm:w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="10.5" cy="10.5" r="7.5" />
-                <path d="M21 3l-5.5 5.5M21 3h-5M21 3v5" />
-              </svg>
-              <span className="font-medium text-xs sm:text-base">Masculine</span>
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                onEditFeminine()
-                onOpenChange(false)
-              }}
-              className="flex flex-col items-center gap-1 sm:gap-2 h-auto py-2.5 sm:py-4 border-border bg-transparent"
-            >
-              <svg className="h-4 w-4 sm:h-5 sm:w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="8" r="6" />
-                <path d="M12 14v7M9 18h6" />
-              </svg>
-              <span className="font-medium text-xs sm:text-base">Feminine</span>
-            </Button>
-          </div>
-
-          {/* Custom Edit */}
-          {!showCustomEdit ? (
-            <Button
-              variant="outline"
-              onClick={() => setShowCustomEdit(true)}
-              className="w-full flex items-center gap-2 h-auto py-2.5 sm:py-4 border-border justify-start bg-transparent overflow-hidden"
-            >
-              <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-full bg-secondary flex items-center justify-center flex-shrink-0">
-                <Pencil className="h-3 w-3 sm:h-4 sm:w-4" />
-              </div>
-              <div className="text-left min-w-0 flex-1">
-                <span className="font-medium text-xs sm:text-base block truncate">Describe your own edit</span>
-                <span className="text-[10px] sm:text-sm text-muted-foreground block truncate">Change colors, remove items, etc.</span>
-              </div>
-            </Button>
-          ) : (
-            <div className="space-y-2">
-              <Textarea
-                placeholder="Describe the changes you want..."
-                value={customDescription}
-                onChange={(e) => setCustomDescription(e.target.value)}
-                className="min-h-16 sm:min-h-24 bg-secondary border-border text-xs sm:text-sm"
-              />
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowCustomEdit(false)}
-                  className="flex-1 bg-transparent text-xs sm:text-sm py-2"
+          {/* Quick suggestions */}
+          <div className="mb-4">
+            <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-2">Quick suggestions</p>
+            <div className="flex flex-wrap gap-1.5 sm:gap-2">
+              {QUICK_SUGGESTIONS.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  onClick={() => handleSuggestionClick(suggestion)}
+                  className="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full border border-border bg-background text-[10px] sm:text-xs text-foreground hover:bg-secondary hover:border-primary/30 transition-colors"
                 >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleCustomSubmit}
-                  disabled={!customDescription.trim()}
-                  className="flex-1 bg-primary hover:bg-primary/90 text-xs sm:text-sm py-2"
-                >
-                  Apply Edit
-                </Button>
-              </div>
+                  {suggestion}
+                </button>
+              ))}
             </div>
-          )}
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="bg-transparent border-border text-xs sm:text-sm"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCustomSubmit}
+              disabled={!customDescription.trim() || remainingActions <= 0}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs sm:text-sm"
+            >
+              Regenerate
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

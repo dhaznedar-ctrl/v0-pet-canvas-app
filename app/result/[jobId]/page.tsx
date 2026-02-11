@@ -2,11 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import Image from 'next/image'
-import Link from 'next/link'
 import { TopBar, type TabType } from '@/components/fable/top-bar'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, Edit, Loader2 } from 'lucide-react'
+import { RefreshCw, Loader2 } from 'lucide-react'
+import { ProtectedImage } from '@/components/fable/protected-image'
 
 interface JobResult {
   status: 'queued' | 'processing' | 'completed' | 'failed'
@@ -87,25 +86,53 @@ export default function ResultPage() {
                 </p>
               </div>
             ) : job?.status === 'completed' && job.outputUrl ? (
-              <div className="relative w-full max-w-2xl">
-                <div className="relative aspect-[3/4] rounded-2xl overflow-hidden shadow-2xl shadow-black/40">
-                  <Image
-                    src={job.outputUrl || "/placeholder.svg"}
+              <div className="relative w-full max-w-2xl select-none">
+                <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/40">
+                  {/* Canvas-based image rendering to prevent right-click save */}
+                  <ProtectedImage
+                    src={job.outputUrl}
                     alt="Your masterpiece"
-                    fill
-                    className="object-cover"
-                    priority
+                    className="w-full"
+                    aspectRatio="3/4"
                   />
+                  {/* CSS watermark overlay */}
+                  <div className="absolute inset-0 z-20 pointer-events-none overflow-hidden">
+                    <div
+                      className="absolute inset-0 flex flex-wrap content-start gap-x-6 gap-y-4 sm:gap-x-10 sm:gap-y-6 p-2"
+                      style={{ transform: 'rotate(-35deg) scale(1.8)', transformOrigin: 'center center' }}
+                    >
+                      {Array.from({ length: 60 }).map((_, i) => (
+                        <span
+                          key={i}
+                          className="text-white/15 text-base sm:text-xl md:text-2xl font-black tracking-[0.2em] whitespace-nowrap uppercase"
+                          style={{ textShadow: '0 1px 3px rgba(0,0,0,0.2)' }}
+                        >
+                          PETCANVAS
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                
+
+                {/* Free Preview Badge */}
+                <div className="absolute -top-3 left-4 z-30">
+                  <span className="bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-full">
+                    Free Preview
+                  </span>
+                </div>
+
                 {/* Retry/Edit Button */}
                 <button
                   onClick={handleRetry}
-                  className="absolute top-4 right-4 flex items-center gap-2 px-4 py-2 bg-secondary/80 backdrop-blur-sm rounded-full text-sm text-foreground hover:bg-secondary transition-colors"
+                  className="absolute top-4 right-4 z-30 flex items-center gap-2 px-4 py-2 bg-secondary/80 backdrop-blur-sm rounded-full text-sm text-foreground hover:bg-secondary transition-colors"
                 >
                   <RefreshCw className="h-4 w-4" />
                   Retry or Edit
                 </button>
+
+                <p className="text-xs sm:text-sm text-muted-foreground text-center mt-3">
+                  This is a watermarked preview. Purchase to download the full-resolution version.
+                </p>
               </div>
             ) : (
               <div className="w-full max-w-2xl aspect-[3/4] rounded-2xl bg-card/50 border border-border flex flex-col items-center justify-center p-8">

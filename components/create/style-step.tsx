@@ -73,7 +73,6 @@ export function StyleStep({ formData, updateFormData, onNext, onBack }: StyleSte
                 />
               </div>
               <h3 className="font-semibold text-foreground mb-1">{style.name}</h3>
-              <p className="text-muted-foreground text-sm">{style.description}</p>
             </button>
           ))}
         </div>

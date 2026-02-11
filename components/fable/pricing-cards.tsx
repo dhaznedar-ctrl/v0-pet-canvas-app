@@ -1,71 +1,123 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
-import { Download, Layers, Check, Truck } from 'lucide-react'
+import { Download, Layers, Frame, Check, Truck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { EmailCheckoutModal } from './email-checkout-modal'
+
+export interface PrintOrderDetails {
+  size: string
+  frame: string
+  price: number
+  type: 'poster' | 'canvas'
+}
 
 interface PricingCardsProps {
   onDownload: () => void
-  onOrderPrint: (size: string, type: 'small' | 'large') => void
+  onOrderPrint: (details: PrintOrderDetails) => void
 }
 
-const SMALL_SIZES = [
+const POSTER_SIZES = [
   { size: '8" x 10"', price: 89 },
   { size: '12" x 16"', price: 119 },
-]
-const LARGE_SIZES = [
   { size: '18" x 24"', price: 199 },
-  { size: '24" x 36"', price: 250 },
+  { size: '24" x 32"', price: 299 },
 ]
+
+const POSTER_FRAMES = [
+  { id: 'none', label: 'No Frame' },
+  { id: 'white', label: 'White' },
+  { id: 'black', label: 'Black' },
+  { id: 'walnut', label: 'Walnut' },
+]
+
+// Canvas base prices before +30%
+const CANVAS_SIZES_BASE = [
+  { size: '10" x 12"', base: 89 },
+  { size: '12" x 16"', base: 118 },
+  { size: '16" x 20"', base: 152 },
+  { size: '24" x 32"', base: 193 },
+]
+
+// Apply +30% markup
+const CANVAS_SIZES = CANVAS_SIZES_BASE.map((s) => ({
+  size: s.size,
+  price: Math.round(s.base * 1.3),
+}))
+
+const CANVAS_FRAMES = [
+  { id: 'stretched', label: 'Stretched (No Frame)' },
+  { id: 'white', label: 'White' },
+  { id: 'black', label: 'Black' },
+  { id: 'walnut', label: 'Walnut' },
+]
+
+const POSTER_FRAME_MULTIPLIER = 1.35
+const CANVAS_FRAME_MULTIPLIER = 1.40
+const FREE_SHIPPING_THRESHOLD = 150
+
+function calculatePrice(basePrice: number, frameId: string, multiplier: number): number {
+  const noFrameIds = ['none', 'stretched']
+  if (noFrameIds.includes(frameId)) return basePrice
+  return Math.round(basePrice * multiplier)
+}
 
 export function PricingCards({ onDownload, onOrderPrint }: PricingCardsProps) {
-  const [smallSize, setSmallSize] = useState(SMALL_SIZES[0].size)
-  const [largeSize, setLargeSize] = useState(LARGE_SIZES[0].size)
-  const [countdown, setCountdown] = useState('0:19:03')
-  const [emailModalOpen, setEmailModalOpen] = useState(false)
-  const [currentProduct, setCurrentProduct] = useState<{
-    name: string
-    price: number
-    size?: string
-    type?: 'download' | 'small' | 'large'
-  } | null>(null)
+  const [posterSize, setPosterSize] = useState(POSTER_SIZES[0].size)
+  const [posterFrame, setPosterFrame] = useState('none')
+  const [canvasSize, setCanvasSize] = useState(CANVAS_SIZES[0].size)
+  const [canvasFrame, setCanvasFrame] = useState('stretched')
+  const [countdown, setCountdown] = useState(20 * 60) // 20 minutes in seconds
 
-  const selectedSmall = SMALL_SIZES.find(s => s.size === smallSize) || SMALL_SIZES[0]
-  const selectedLarge = LARGE_SIZES.find(s => s.size === largeSize) || LARGE_SIZES[0]
+  // Countdown timer
+  React.useEffect(() => {
+    if (countdown <= 0) return
+    const timer = setInterval(() => {
+      setCountdown((prev) => Math.max(0, prev - 1))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [countdown])
 
+  const formatCountdown = (secs: number) => {
+    const m = Math.floor(secs / 60)
+    const s = secs % 60
+    return `0:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+  }
+
+  const selectedPoster = POSTER_SIZES.find(s => s.size === posterSize) || POSTER_SIZES[0]
+  const selectedCanvas = CANVAS_SIZES.find(s => s.size === canvasSize) || CANVAS_SIZES[0]
+
+  const posterPrice = calculatePrice(selectedPoster.price, posterFrame, POSTER_FRAME_MULTIPLIER)
+  const canvasPrice = calculatePrice(selectedCanvas.price, canvasFrame, CANVAS_FRAME_MULTIPLIER)
+
+  const posterOldPrice = Math.round(posterPrice * 1.31)
+  const canvasOldPrice = Math.round(canvasPrice * 1.31)
+
+  const posterFreeShipping = posterPrice >= FREE_SHIPPING_THRESHOLD
+  const canvasFreeShipping = canvasPrice >= FREE_SHIPPING_THRESHOLD
+
+  // Direct actions — no email modal needed (email already collected)
   const handleDownloadClick = () => {
-    setCurrentProduct({ name: 'Instant Masterpiece', price: 19, type: 'download' })
-    setEmailModalOpen(true)
+    onDownload()
   }
 
-  const handleSmallPrintClick = () => {
-    setCurrentProduct({ name: `Small Art Print (${smallSize})`, price: selectedSmall.price, size: smallSize, type: 'small' })
-    setEmailModalOpen(true)
+  const handlePosterClick = () => {
+    onOrderPrint({
+      size: posterSize,
+      frame: posterFrame,
+      price: posterPrice,
+      type: 'poster',
+    })
   }
 
-  const handleLargePrintClick = () => {
-    setCurrentProduct({ name: `Large Art Print (${largeSize})`, price: selectedLarge.price, size: largeSize, type: 'large' })
-    setEmailModalOpen(true)
-  }
-
-  const handleEmailSubmit = (email: string) => {
-    setEmailModalOpen(false)
-    
-    // TODO: Backend integration - pass email to checkout flow
-    // 1. Create order in database with email
-    // 2. Initialize payment provider checkout (Stripe/IyziCo/PayPal/PayTR)
-    // 3. Redirect to secure checkout
-    
-    if (currentProduct?.type === 'download') {
-      onDownload()
-    } else if (currentProduct?.type === 'small' && currentProduct.size) {
-      onOrderPrint(currentProduct.size, 'small')
-    } else if (currentProduct?.type === 'large' && currentProduct.size) {
-      onOrderPrint(currentProduct.size, 'large')
-    }
+  const handleCanvasClick = () => {
+    onOrderPrint({
+      size: canvasSize,
+      frame: canvasFrame,
+      price: canvasPrice,
+      type: 'canvas',
+    })
   }
 
   return (
@@ -75,7 +127,7 @@ export function PricingCards({ onDownload, onOrderPrint }: PricingCardsProps) {
       </h2>
 
       <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-        {/* Instant Masterpiece Card */}
+        {/* Digital Portrait Card */}
         <div className="relative rounded-2xl border border-border bg-card p-6 flex flex-col">
           {/* Most Popular Badge */}
           <div className="absolute -top-3 left-6">
@@ -88,19 +140,15 @@ export function PricingCards({ onDownload, onOrderPrint }: PricingCardsProps) {
             <Download className="h-8 w-8 text-muted-foreground" />
           </div>
 
-          <h3 className="font-serif text-xl text-center text-foreground mb-2">Instant Masterpiece</h3>
-          
-          <div className="flex justify-center mb-1">
-            <span className="bg-secondary text-secondary-foreground text-xs px-2 py-0.5 rounded">Pets</span>
-          </div>
+          <h3 className="font-serif text-xl text-center text-foreground mb-2">Digital Portrait</h3>
 
           <div className="text-center mb-1">
-            <span className="text-muted-foreground line-through text-sm">$29</span>
-            <span className="text-3xl font-bold text-foreground ml-2">$19</span>
+            <span className="text-muted-foreground line-through text-sm">$39</span>
+            <span className="text-3xl font-bold text-foreground ml-2">$29</span>
           </div>
 
           <p className="text-center text-muted-foreground text-sm mb-4">
-            Expires in <span className="text-foreground font-medium">{countdown}</span>
+            Expires in <span className="text-foreground font-medium">{formatCountdown(countdown)}</span>
           </p>
 
           <p className="text-center text-muted-foreground text-sm mb-6">
@@ -123,7 +171,7 @@ export function PricingCards({ onDownload, onOrderPrint }: PricingCardsProps) {
           </div>
 
           <Button onClick={handleDownloadClick} className="w-full bg-foreground text-background hover:bg-foreground/90">
-            Download Now
+            Get My Portrait
           </Button>
 
           <div className="mt-6 pt-4 border-t border-border text-center">
@@ -134,31 +182,52 @@ export function PricingCards({ onDownload, onOrderPrint }: PricingCardsProps) {
           </div>
         </div>
 
-        {/* Small Art Print Card */}
+        {/* Fine Art Print Card */}
         <div className="rounded-2xl border border-border bg-card p-6 flex flex-col">
           <div className="flex justify-center mb-4">
             <Layers className="h-8 w-8 text-muted-foreground" />
           </div>
 
-          <h3 className="font-serif text-xl text-center text-foreground mb-4">Small Art Print</h3>
+          <h3 className="font-serif text-xl text-center text-foreground mb-4">Fine Art Print</h3>
 
           <div className="text-center mb-4">
-            <span className="text-3xl font-bold text-foreground">${selectedSmall.price}</span>
+            <span className="text-muted-foreground line-through text-sm">${posterOldPrice}</span>
+            <span className="text-3xl font-bold text-foreground ml-2">${posterPrice}</span>
           </div>
 
           <p className="text-center text-muted-foreground text-sm mb-6">
             Printed on museum-quality archival paper with fade-resistant inks.
           </p>
 
-          <div className="mb-4">
+          {/* Size selector */}
+          <div className="mb-3">
             <p className="text-sm text-muted-foreground mb-2">Choose Size</p>
-            <Select value={smallSize} onValueChange={setSmallSize}>
+            <Select value={posterSize} onValueChange={setPosterSize}>
               <SelectTrigger className="w-full bg-secondary border-border">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {SMALL_SIZES.map((size) => (
-                  <SelectItem key={size.size} value={size.size}>{size.size}</SelectItem>
+                {POSTER_SIZES.map((s) => (
+                  <SelectItem key={s.size} value={s.size}>
+                    {s.size} — ${s.price}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Frame selector */}
+          <div className="mb-4">
+            <p className="text-sm text-muted-foreground mb-2">Frame</p>
+            <Select value={posterFrame} onValueChange={setPosterFrame}>
+              <SelectTrigger className="w-full bg-secondary border-border">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {POSTER_FRAMES.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>
+                    {f.label}{f.id !== 'none' ? ` (+${Math.round((POSTER_FRAME_MULTIPLIER - 1) * 100)}%)` : ''}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -184,8 +253,14 @@ export function PricingCards({ onDownload, onOrderPrint }: PricingCardsProps) {
               <Truck className="h-4 w-4 text-foreground" />
               <div>
                 <p className="text-sm">
-                  <span className="font-semibold text-foreground">Free Shipping</span>
-                  <span className="text-muted-foreground"> ($20 value)</span>
+                  {posterFreeShipping ? (
+                    <>
+                      <span className="font-semibold text-foreground">Free Shipping</span>
+                      <span className="text-muted-foreground"> ($20 value)</span>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">Free shipping over ${FREE_SHIPPING_THRESHOLD}</span>
+                  )}
                 </p>
                 <p className="text-xs text-muted-foreground">Delivery: 7-9 days</p>
               </div>
@@ -194,16 +269,16 @@ export function PricingCards({ onDownload, onOrderPrint }: PricingCardsProps) {
 
           <p className="text-primary text-sm mb-4">+ Includes digital download</p>
 
-          <Button 
-            variant="outline" 
-            onClick={handleSmallPrintClick}
+          <Button
+            variant="outline"
+            onClick={handlePosterClick}
             className="w-full border-foreground text-foreground hover:bg-foreground hover:text-background bg-transparent"
           >
-            Order Print
+            Order Fine Art Print
           </Button>
         </div>
 
-        {/* Large Art Print Card */}
+        {/* Stretched Canvas Card */}
         <div className="relative rounded-2xl border-2 border-accent bg-card p-6 flex flex-col">
           {/* The Perfect Gift Badge */}
           <div className="absolute -top-3 left-1/2 -translate-x-1/2">
@@ -213,28 +288,49 @@ export function PricingCards({ onDownload, onOrderPrint }: PricingCardsProps) {
           </div>
 
           <div className="flex justify-center mb-4 mt-2">
-            <Layers className="h-8 w-8 text-muted-foreground" />
+            <Frame className="h-8 w-8 text-muted-foreground" />
           </div>
 
-          <h3 className="font-serif text-xl text-center text-foreground mb-4">Large Art Print</h3>
+          <h3 className="font-serif text-xl text-center text-foreground mb-4">Stretched Canvas</h3>
 
           <div className="text-center mb-4">
-            <span className="text-3xl font-bold text-accent">${selectedLarge.price}</span>
+            <span className="text-muted-foreground line-through text-sm">${canvasOldPrice}</span>
+            <span className="text-3xl font-bold text-accent ml-2">${canvasPrice}</span>
           </div>
 
           <p className="text-center text-muted-foreground text-sm mb-6">
-            Printed on museum-quality archival paper with fade-resistant inks.
+            Gallery-wrapped canvas with professional quality — ready to hang.
           </p>
 
-          <div className="mb-4">
+          {/* Size selector */}
+          <div className="mb-3">
             <p className="text-sm text-muted-foreground mb-2">Choose Size</p>
-            <Select value={largeSize} onValueChange={setLargeSize}>
+            <Select value={canvasSize} onValueChange={setCanvasSize}>
               <SelectTrigger className="w-full bg-secondary border-border">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {LARGE_SIZES.map((size) => (
-                  <SelectItem key={size.size} value={size.size}>{size.size}</SelectItem>
+                {CANVAS_SIZES.map((s) => (
+                  <SelectItem key={s.size} value={s.size}>
+                    {s.size} — ${s.price}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Frame selector */}
+          <div className="mb-4">
+            <p className="text-sm text-muted-foreground mb-2">Frame</p>
+            <Select value={canvasFrame} onValueChange={setCanvasFrame}>
+              <SelectTrigger className="w-full bg-secondary border-border">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CANVAS_FRAMES.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>
+                    {f.label}{f.id !== 'stretched' ? ` (+${Math.round((CANVAS_FRAME_MULTIPLIER - 1) * 100)}%)` : ''}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -243,15 +339,15 @@ export function PricingCards({ onDownload, onOrderPrint }: PricingCardsProps) {
           <div className="space-y-2 mb-4">
             <div className="flex items-center gap-2 text-sm">
               <Check className="h-4 w-4 text-primary" />
-              <span className="text-muted-foreground">Museum-quality archival paper</span>
+              <span className="text-muted-foreground">Gallery-wrapped canvas</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Check className="h-4 w-4 text-primary" />
+              <span className="text-muted-foreground">Ready to hang</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <Check className="h-4 w-4 text-primary" />
               <span className="text-muted-foreground">Fade-resistant inks</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Check className="h-4 w-4 text-primary" />
-              <span className="text-muted-foreground">Made to last decades</span>
             </div>
           </div>
 
@@ -260,8 +356,14 @@ export function PricingCards({ onDownload, onOrderPrint }: PricingCardsProps) {
               <Truck className="h-4 w-4 text-foreground" />
               <div>
                 <p className="text-sm">
-                  <span className="font-semibold text-foreground">Free Shipping</span>
-                  <span className="text-muted-foreground"> ($20 value)</span>
+                  {canvasFreeShipping ? (
+                    <>
+                      <span className="font-semibold text-foreground">Free Shipping</span>
+                      <span className="text-muted-foreground"> ($20 value)</span>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">Free shipping over ${FREE_SHIPPING_THRESHOLD}</span>
+                  )}
                 </p>
                 <p className="text-xs text-muted-foreground">Delivery: 7-9 days</p>
               </div>
@@ -270,24 +372,15 @@ export function PricingCards({ onDownload, onOrderPrint }: PricingCardsProps) {
 
           <p className="text-primary text-sm mb-4">+ Includes digital download</p>
 
-          <Button 
-            variant="outline" 
-            onClick={handleLargePrintClick}
+          <Button
+            variant="outline"
+            onClick={handleCanvasClick}
             className="w-full border-foreground text-foreground hover:bg-foreground hover:text-background bg-transparent"
           >
-            Order Print
+            Order Canvas Print
           </Button>
         </div>
       </div>
-
-      {/* Email Checkout Modal */}
-      <EmailCheckoutModal
-        open={emailModalOpen}
-        onOpenChange={setEmailModalOpen}
-        onContinue={handleEmailSubmit}
-        productName={currentProduct?.name}
-        price={currentProduct?.price}
-      />
     </div>
   )
 }

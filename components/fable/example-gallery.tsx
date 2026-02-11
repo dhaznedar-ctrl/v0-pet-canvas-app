@@ -15,14 +15,24 @@ const KIDS_IMG_1 = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/fabl
 const KIDS_IMG_2 = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/fable-kids-2.jpg-M86Vd8b3qEY6FuARIq0UzS3ZyXfhq9.png'
 const KIDS_IMG_3 = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/fable-kids-3.jpg-QIHlhDt4nOaoGMvitJ1SNzf5im3JKl.png'
 
-const GALLERY_IMAGES = {
+const GALLERY_IMAGES: Record<TabType, string[]> = {
   pets: [
     '/images/1761061991787-fable-by-surrealium-example-1.jpg',
     '/images/1761061998281-fable-by-surrealium-example-2.jpg',
-    '/images/1761061991787-fable-by-surrealium-example-1-20-281-29.jpg',
+    '/samples/horse-masterpiece.jpg',
   ],
   family: [FAMILY_IMG_1, FAMILY_IMG_2, FAMILY_IMG_3],
   kids: [KIDS_IMG_1, KIDS_IMG_2, KIDS_IMG_3],
+  couples: [
+    '/images/couples/couple-1.jpg',
+    '/images/couples/couple-2.jpg',
+    '/images/couples/couple-1.jpg',
+  ],
+  self: [
+    '/images/self-portrait/self-1.jpg',
+    '/images/self-portrait/self-2.jpg',
+    '/samples/self-portrait.jpg',
+  ],
 }
 
 export function ExampleGallery({ activeTab }: ExampleGalleryProps) {

@@ -2,25 +2,44 @@
 
 import { useCallback, useState, useEffect } from 'react'
 import Image from 'next/image'
-import { useDropzone } from 'react-dropzone'
-import { Plus, Palette, X, RefreshCw, PawPrint, AlertCircle, Lock } from 'lucide-react'
+import { useDropzone, type FileRejection } from 'react-dropzone'
+import { Plus, Palette, X, Pencil, PawPrint, AlertCircle, Lock, Sparkles, ImagePlus, Mail, Check, Star, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/use-toast'
 import type { TabType } from './top-bar'
 import { RetryOptionsModal } from './retry-options-modal'
 import { ConsentCheckbox, CONSENT_CONTENT } from './consent-checkbox'
+import { ProtectedImage } from './protected-image'
+
+// Photo type from parent
+interface UploadedPhoto {
+  preview: string
+  file: File
+  uploadId?: number
+  fileUrl?: string
+}
 
 interface UploadCardProps {
   activeTab: TabType
-  uploadedImage: string | null
-  onImageUpload: (image: string, file: File) => void
-  onClearImage: () => void
+  photos: UploadedPhoto[]
+  maxPhotos: number
+  onAddPhotos: (photos: { preview: string; file: File }[]) => void
+  onRemovePhoto: (index: number) => void
+  onGenerate: () => void
+  onClearAll: () => void
   onOpenStylePicker: () => void
   selectedStyleName: string | null
   isGenerating?: boolean
   generatedImage?: string | null
   onRetry?: () => void
+  onCustomEdit?: (description: string) => void
   onGenerationComplete?: (generatedImage: string) => void
+  remainingCredits?: number
+  userEmail?: string
+  onUserEmailChange?: (email: string) => void
+  petName?: string
+  onPetNameChange?: (name: string) => void
 }
 
 // Consent state interface
@@ -28,9 +47,10 @@ interface ConsentState {
   photoRights: boolean
   usageRights: boolean
   guardianship: boolean
+  kvkk: boolean
 }
 
-const TAB_CONTENT = {
+const TAB_CONTENT: Record<TabType, { title: string; subtitle: string }> = {
   pets: {
     title: 'Upload Photo',
     subtitle: 'Use a well-lit photo',
@@ -43,6 +63,50 @@ const TAB_CONTENT = {
     title: 'Upload Photo',
     subtitle: 'Full faces, no cropping',
   },
+  couples: {
+    title: 'Upload your couple photo',
+    subtitle: 'Both faces clearly visible',
+  },
+  self: {
+    title: 'Upload your portrait photo',
+    subtitle: 'Clear face, good lighting',
+  },
+}
+
+const DETAIL_SECTION: Record<TabType, { heading: string; namePlaceholder: string; nameLabel: string }> = {
+  pets: {
+    heading: 'Tell us more about your pet',
+    nameLabel: 'Pet Name',
+    namePlaceholder: 'e.g., Max, Luna, Charlie...',
+  },
+  family: {
+    heading: 'Tell us more about your family',
+    nameLabel: 'Family Name',
+    namePlaceholder: 'e.g., The Johnsons...',
+  },
+  kids: {
+    heading: "Tell us more about your child",
+    nameLabel: "Child's Name",
+    namePlaceholder: 'e.g., Emma, Liam...',
+  },
+  couples: {
+    heading: 'Tell us more about you two',
+    nameLabel: 'Your Names',
+    namePlaceholder: 'e.g., Sarah & John...',
+  },
+  self: {
+    heading: 'Tell us more about yourself',
+    nameLabel: 'Your Name',
+    namePlaceholder: 'e.g., Alex, Jordan...',
+  },
+}
+
+const PORTRAIT_TITLE: Record<TabType, string> = {
+  pets: 'Royal Portrait',
+  family: 'Family Masterpiece',
+  kids: 'Enchanting Portrait',
+  couples: 'Timeless Portrait',
+  self: 'Renaissance Portrait',
 }
 
 // Rotating photo tips that fade in/out
@@ -72,18 +136,25 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
 export function UploadCard({
   activeTab,
-  uploadedImage,
-  onImageUpload,
-  onClearImage,
+  photos,
+  maxPhotos,
+  onAddPhotos,
+  onRemovePhoto,
+  onGenerate,
+  onClearAll,
   onOpenStylePicker,
   selectedStyleName,
   isGenerating = false,
   generatedImage = null,
   onRetry,
+  onCustomEdit,
   onGenerationComplete,
+  remainingCredits = 5,
+  userEmail = '',
+  onUserEmailChange,
+  petName = '',
+  onPetNameChange,
 }: UploadCardProps) {
-  const [isUploading, setIsUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
   const [progress, setProgress] = useState(0)
   const [messageIndex, setMessageIndex] = useState(0)
   const [remainingSeconds, setRemainingSeconds] = useState(60)
@@ -91,15 +162,17 @@ export function UploadCard({
   const [tipIndex, setTipIndex] = useState(0)
   const [tipFading, setTipFading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
-  
+
   // Consent state
   const [consents, setConsents] = useState<ConsentState>({
     photoRights: false,
     usageRights: false,
     guardianship: false,
+    kvkk: false,
   })
-  
+
   const content = TAB_CONTENT[activeTab]
+  const detailContent = DETAIL_SECTION[activeTab]
 
   // Check if consents are valid based on active tab
   const areConsentsValid = useCallback(() => {
@@ -116,13 +189,14 @@ export function UploadCard({
       photoRights: false,
       usageRights: false,
       guardianship: false,
+      kvkk: false,
     })
   }, [activeTab])
 
-  // Rotating tips animation - change every second with fade
+  // Rotating tips animation
   useEffect(() => {
-    if (uploadedImage || isGenerating || generatedImage) return
-    
+    if (photos.length > 0 || isGenerating || generatedImage) return
+
     const tipInterval = setInterval(() => {
       setTipFading(true)
       setTimeout(() => {
@@ -132,11 +206,11 @@ export function UploadCard({
     }, 2000)
 
     return () => clearInterval(tipInterval)
-  }, [uploadedImage, isGenerating, generatedImage])
+  }, [photos.length, isGenerating, generatedImage])
 
   // Generation progress animation - 60 seconds total
   useEffect(() => {
-    if (!isGenerating || !uploadedImage) {
+    if (!isGenerating) {
       setProgress(0)
       setMessageIndex(0)
       setRemainingSeconds(60)
@@ -144,199 +218,196 @@ export function UploadCard({
     }
 
     const startTime = Date.now()
-    const totalDuration = 60000 // 60 seconds
+    const totalDuration = 60000
 
     const progressInterval = setInterval(() => {
       const elapsed = Date.now() - startTime
       const newProgress = Math.min((elapsed / totalDuration) * 100, 100)
       setProgress(newProgress)
-      
+
       const remaining = Math.max(0, Math.ceil((totalDuration - elapsed) / 1000))
       setRemainingSeconds(remaining)
-      
+
       if (elapsed >= totalDuration) {
         clearInterval(progressInterval)
-        if (onGenerationComplete && uploadedImage) {
-          onGenerationComplete(uploadedImage)
-        }
       }
     }, 100)
 
     const messageInterval = setInterval(() => {
       setMessageIndex((prev) => (prev + 1) % GENERATION_MESSAGES.length)
-    }, 7000)
+    }, 3500)
 
     return () => {
       clearInterval(progressInterval)
       clearInterval(messageInterval)
     }
-  }, [isGenerating, uploadedImage, onGenerationComplete])
-
-  const validateFile = (file: File): string | null => {
-    // Check file type
-    if (!file.type.match(/^image\/(jpeg|png)$/)) {
-      return 'Invalid file type. Please upload a JPG or PNG image.'
-    }
-    // Check file size
-    if (file.size > MAX_FILE_SIZE) {
-      return 'File too large. Maximum size is 10MB.'
-    }
-    return null
-  }
+  }, [isGenerating])
 
   const onDrop = useCallback(
-    (acceptedFiles: File[], fileRejections: Array<{ file: File; errors: Array<{ code: string; message: string }> }>) => {
+    (acceptedFiles: File[], fileRejections: FileRejection[]) => {
       setUploadError(null)
 
-      // Handle rejections
       if (fileRejections.length > 0) {
         const rejection = fileRejections[0]
         const errorCode = rejection.errors[0]?.code
         let errorMsg = 'Failed to upload file.'
-        
+
         if (errorCode === 'file-too-large') {
           errorMsg = 'File too large. Maximum size is 10MB.'
         } else if (errorCode === 'file-invalid-type') {
           errorMsg = 'Invalid file type. Please upload a JPG or PNG image.'
+        } else if (errorCode === 'too-many-files') {
+          errorMsg = `You can upload up to ${maxPhotos} photos.`
         }
-        
+
         setUploadError(errorMsg)
         toast({ title: 'Upload Error', description: errorMsg, variant: 'destructive' })
         return
       }
 
-      const file = acceptedFiles[0]
-      if (!file) return
+      if (acceptedFiles.length === 0) return
 
-      // Additional validation
-      const validationError = validateFile(file)
-      if (validationError) {
-        setUploadError(validationError)
-        toast({ title: 'Upload Error', description: validationError, variant: 'destructive' })
-        return
-      }
+      // Read files and create previews
+      const newPhotos: { preview: string; file: File }[] = []
+      let loaded = 0
 
-      setIsUploading(true)
-      setUploadProgress(0)
-
-      // Simulate upload progress
-      const progressInterval = setInterval(() => {
-        setUploadProgress((prev) => {
-          if (prev >= 90) {
-            clearInterval(progressInterval)
-            return prev
+      acceptedFiles.forEach((file) => {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          newPhotos.push({
+            preview: e.target?.result as string,
+            file,
+          })
+          loaded++
+          if (loaded === acceptedFiles.length) {
+            onAddPhotos(newPhotos)
           }
-          return prev + 10
-        })
-      }, 100)
-
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        clearInterval(progressInterval)
-        setUploadProgress(100)
-        const result = e.target?.result as string
-        
-        setTimeout(() => {
-          onImageUpload(result, file)
-          setIsUploading(false)
-          setUploadProgress(0)
-        }, 200)
-      }
-      reader.onerror = () => {
-        clearInterval(progressInterval)
-        setIsUploading(false)
-        setUploadProgress(0)
-        const errorMsg = 'Error reading file. Please try again.'
-        setUploadError(errorMsg)
-        toast({ title: 'Upload Error', description: errorMsg, variant: 'destructive' })
-      }
-      reader.readAsDataURL(file)
+        }
+        reader.readAsDataURL(file)
+      })
     },
-    [onImageUpload]
+    [onAddPhotos, maxPhotos]
   )
 
-  const isUploadDisabled = !areConsentsValid() || isUploading || isGenerating || !!generatedImage
+  const canAddMore = photos.length < maxPhotos
+  const isUploadDisabled = !areConsentsValid() || isGenerating || !!generatedImage
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
     accept: ACCEPTED_TYPES,
-    maxFiles: 1,
+    maxFiles: maxPhotos - photos.length,
     maxSize: MAX_FILE_SIZE,
     disabled: isUploadDisabled,
+    noClick: photos.length > 0, // disable click on root when photos exist
+    noKeyboard: photos.length > 0,
   })
 
-  // Show generated image with watermark
+  // Show generated image with watermark — split-screen layout
   if (generatedImage) {
+    const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+    const portraitTitle = petName
+      ? `${capitalize(petName.trim())}'s ${PORTRAIT_TITLE[activeTab]}`
+      : `Your ${PORTRAIT_TITLE[activeTab]}`
+
     return (
       <>
-        <div className="relative w-full max-w-2xl mx-auto">
-          {/* Free Preview Badge */}
-          <div className="absolute -top-3 left-4 z-20">
-            <span className="bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-full">
-              Free Preview
-            </span>
-          </div>
-
-          <div className="relative rounded-xl overflow-hidden bg-card border border-border">
-            {/* Retry or Edit Button */}
-            <button
-              onClick={() => setRetryModalOpen(true)}
-              className="absolute top-2 right-2 sm:top-3 sm:right-3 z-20 flex items-center gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1.5 bg-secondary/80 backdrop-blur-sm rounded-md text-xs sm:text-sm text-foreground hover:bg-secondary transition-all"
-            >
-              <RefreshCw className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-              <span>Retry or Edit</span>
-            </button>
-
-            {/* Generated Image - NOT clickable, NOT downloadable */}
-            <div 
-              className="relative aspect-[3/4] select-none"
-              onContextMenu={(e) => e.preventDefault()}
-            >
-              <Image
-                src={generatedImage || "/placeholder.svg"}
-                alt="Generated masterpiece preview"
-                fill
-                className="object-cover pointer-events-none"
-                draggable={false}
-              />
-              {/* Single Watermark Overlay - diagonal repeating pattern */}
-              <div 
-                className="absolute inset-0 pointer-events-none z-10"
-                style={{
-                  backgroundImage: `repeating-linear-gradient(
-                    -45deg,
-                    transparent,
-                    transparent 80px,
-                    rgba(255,255,255,0.08) 80px,
-                    rgba(255,255,255,0.08) 82px
-                  )`,
-                }}
+        <div className="w-full max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 items-start">
+          {/* Left — Preview Image */}
+          <div className="relative">
+            <div className="relative rounded-xl overflow-hidden bg-card border border-border">
+              {/* Edit Button */}
+              <button
+                onClick={() => setRetryModalOpen(true)}
+                className="absolute top-2 right-2 sm:top-3 sm:right-3 z-30 flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 bg-foreground/80 backdrop-blur-sm rounded-full text-xs sm:text-sm text-background hover:bg-foreground transition-all"
               >
-                <div 
-                  className="absolute inset-0 flex flex-wrap items-center justify-center content-center gap-x-16 gap-y-12 p-4"
-                  style={{ transform: 'rotate(-25deg) scale(1.5)' }}
-                >
-                  {Array.from({ length: 20 }).map((_, i) => (
-                    <span 
-                      key={i} 
-                      className="text-white/20 text-[10px] sm:text-xs font-bold tracking-widest whitespace-nowrap uppercase"
-                      style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
-                    >
-                      PET CANVAS PREVIEW
-                    </span>
-                  ))}
+                <Pencil className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                <span>Edit ({remainingCredits} left)</span>
+              </button>
+
+              {/* Generated Image — canvas-based to prevent right-click save */}
+              <div className="relative aspect-[4/5] select-none">
+                <ProtectedImage
+                  src={generatedImage}
+                  alt="Generated masterpiece preview"
+                  className="absolute inset-0"
+                  aspectRatio="4/5"
+                />
+                <div className="absolute inset-0 z-10" />
+                {/* Dense watermark overlay */}
+                <div className="absolute inset-0 z-20 pointer-events-none overflow-hidden">
+                  <div
+                    className="absolute flex flex-wrap content-start gap-x-3 gap-y-2 sm:gap-x-4 sm:gap-y-3"
+                    style={{
+                      transform: 'rotate(-30deg) scale(2.2)',
+                      transformOrigin: 'center center',
+                      top: '-50%',
+                      left: '-50%',
+                      width: '200%',
+                      height: '200%',
+                    }}
+                  >
+                    {Array.from({ length: 150 }).map((_, i) => (
+                      <span
+                        key={i}
+                        className="text-white/[0.12] text-[10px] sm:text-sm font-bold tracking-[0.15em] whitespace-nowrap uppercase"
+                        style={{ textShadow: '0 1px 2px rgba(0,0,0,0.15)' }}
+                      >
+                        petcanvas create
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Watermark notice */}
-          <p className="text-xs sm:text-sm text-muted-foreground text-center mt-3">
-            This is a watermarked preview. Purchase to download the full-resolution version.
-          </p>
+          {/* Right — Info Panel */}
+          <div className="flex flex-col justify-center py-2 sm:py-4">
+            <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl italic text-foreground leading-tight mb-6">
+              {portraitTitle}
+            </h2>
+
+            <div className="space-y-3 mb-6">
+              {[
+                'High-Resolution, Print-Ready Quality',
+                'Instant Digital Download',
+                'Museum-Quality Artwork',
+                'Perfect for Printing or Framing',
+              ].map((item) => (
+                <div key={item} className="flex items-center gap-2.5">
+                  <Check className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                  <span className="text-sm sm:text-base text-foreground">{item}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Trust badge */}
+            <div className="border-t border-border pt-4 mb-6">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Trusted by 10,000+ customers</p>
+              <div className="flex items-center gap-1.5 mb-1">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Star key={i} className="h-4 w-4 text-amber-400 fill-amber-400" />
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">4.9/5 average rating</p>
+            </div>
+
+            {/* CTA Button */}
+            <button
+              onClick={() => {
+                document.getElementById('pricing-section')?.scrollIntoView({ behavior: 'smooth' })
+              }}
+              className="w-full py-3.5 sm:py-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-base sm:text-lg transition-colors mb-3"
+            >
+              Get Your Portrait Now
+            </button>
+
+            <p className="text-xs sm:text-sm text-muted-foreground text-center">
+              Starting from <span className="font-semibold text-foreground">$29</span>
+            </p>
+          </div>
         </div>
 
-        {/* Retry Options Modal */}
         <RetryOptionsModal
           open={retryModalOpen}
           onOpenChange={setRetryModalOpen}
@@ -346,41 +417,48 @@ export function UploadCard({
           onUploadNew={() => {
             if (onRetry) onRetry()
           }}
-          onEditMasculine={() => {
-            // TODO: Gemini API integration for masculine edit
-            console.log('Edit: Masculine')
-          }}
-          onEditFeminine={() => {
-            // TODO: Gemini API integration for feminine edit
-            console.log('Edit: Feminine')
-          }}
           onCustomEdit={(description) => {
-            // TODO: Gemini API integration for custom edit
-            console.log('Custom edit:', description)
+            if (onCustomEdit) onCustomEdit(description)
           }}
         />
       </>
     )
   }
 
-  // Show generation progress when generating
+  // Show generation progress
   if (isGenerating) {
+    const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+    const displayName = petName?.trim() ? capitalize(petName.trim()) : null
+    const PORTRAIT_LABEL: Record<string, string> = {
+      pets: 'Masterpiece',
+      family: 'Family Portrait',
+      kids: 'Enchanting Portrait',
+      couples: 'Timeless Portrait',
+      self: 'Renaissance Portrait',
+    }
+    const label = PORTRAIT_LABEL[activeTab] || 'Masterpiece'
+    const personalMessage = displayName
+      ? `We are creating ${displayName}'s ${label}...`
+      : `We are creating your ${label}...`
+
     return (
       <div className="relative w-full max-w-4xl mx-auto">
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="flex flex-col items-center justify-center py-12 sm:py-16 px-4 sm:px-8">
-            <p className="text-foreground text-base sm:text-lg font-medium mb-6 sm:mb-8 text-center">
+            <p className="font-serif text-xl sm:text-2xl italic text-foreground mb-2 text-center">
+              {personalMessage}
+            </p>
+            <p className="text-muted-foreground text-sm sm:text-base mb-6 sm:mb-8 text-center">
               {GENERATION_MESSAGES[messageIndex]}
             </p>
-            
-            {/* Progress Bar */}
+
             <div className="w-full max-w-xs h-1.5 bg-muted rounded-full overflow-hidden mb-4">
-              <div 
+              <div
                 className="h-full bg-foreground transition-all duration-100 ease-linear rounded-full"
                 style={{ width: `${progress}%` }}
               />
             </div>
-            
+
             <p className="text-muted-foreground text-sm mb-1">{Math.round(progress)}%</p>
             <p className="text-muted-foreground/70 text-sm">~{remainingSeconds} seconds remaining</p>
           </div>
@@ -423,20 +501,91 @@ export function UploadCard({
         </div>
       </div>
 
-      {/* Upload Card */}
+      {/* Pet Name & Email Section — shown after consents are accepted */}
+      {areConsentsValid() && (
+        <div className="mb-4 p-3 sm:p-4 rounded-xl border border-border bg-card">
+          <h3 className="font-serif text-sm sm:text-lg italic text-foreground mb-3">
+            {detailContent.heading}
+          </h3>
+
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="detail-name" className="text-xs sm:text-sm font-medium text-foreground mb-1 block">
+                {detailContent.nameLabel} <span className="text-destructive">*</span>
+              </label>
+              <Input
+                id="detail-name"
+                type="text"
+                placeholder={detailContent.namePlaceholder}
+                value={petName}
+                onChange={(e) => onPetNameChange?.(e.target.value)}
+                className="bg-background border-border text-xs sm:text-sm h-9 sm:h-10"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="detail-email" className="text-xs sm:text-sm font-medium text-foreground mb-1 flex items-center gap-1.5">
+                <Mail className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                Email <span className="text-destructive">*</span>
+              </label>
+              <Input
+                id="detail-email"
+                type="email"
+                placeholder="your@email.com"
+                value={userEmail}
+                onChange={(e) => onUserEmailChange?.(e.target.value)}
+                className="bg-background border-border text-xs sm:text-sm h-9 sm:h-10"
+              />
+              <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
+                We&apos;ll send your masterpiece here. No spam, ever.
+              </p>
+            </div>
+
+            {/* Honeypot field — hidden from real users, bots fill it */}
+            <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }} aria-hidden="true">
+              <label htmlFor="hp-name-field">Name</label>
+              <input
+                id="hp-name-field"
+                type="text"
+                name="_hp_name"
+                tabIndex={-1}
+                autoComplete="off"
+              />
+            </div>
+
+            {/* KVKK / Privacy consent */}
+            <div className="flex items-start gap-2 pt-1">
+              <input
+                type="checkbox"
+                id="kvkk-consent"
+                checked={consents.kvkk}
+                onChange={(e) => setConsents((prev) => ({ ...prev, kvkk: e.target.checked }))}
+                className="mt-0.5 h-3.5 w-3.5 sm:h-4 sm:w-4 rounded border-border accent-primary"
+              />
+              <label htmlFor="kvkk-consent" className="text-[10px] sm:text-xs text-muted-foreground leading-tight cursor-pointer">
+                I agree to the processing of my personal data in accordance with the{' '}
+                <a href="/policies/privacy" className="text-primary underline hover:no-underline">Privacy Policy</a>{' '}
+                and <a href="/policies/terms" className="text-primary underline hover:no-underline">Terms of Service</a>.
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Area */}
       <div
         {...getRootProps()}
         className={`
-          relative overflow-hidden rounded-xl border transition-all bg-secondary
-          ${isUploadDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:border-primary/50'}
-          ${isDragActive ? 'border-primary bg-primary/10' : 'border-border'}
+          relative overflow-hidden rounded-2xl border transition-all bg-card
+          ${isUploadDisabled ? 'cursor-not-allowed opacity-60' : photos.length === 0 ? 'cursor-pointer hover:border-primary/50' : ''}
+          ${isDragActive ? 'border-primary bg-primary/5' : 'border-border'}
           ${uploadError ? 'border-destructive/50' : ''}
         `}
       >
         <input {...getInputProps()} />
 
-        {/* Locked overlay when consents not accepted - positioned inside the upload box only */}
-        {!areConsentsValid() && !uploadedImage && (
+        {/* Locked overlay when consents not accepted */}
+        {!areConsentsValid() && photos.length === 0 && (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/60 backdrop-blur-[2px] rounded-xl">
             <div className="flex flex-col items-center gap-1.5 text-muted-foreground px-4">
               <Lock className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -445,79 +594,129 @@ export function UploadCard({
           </div>
         )}
 
-        {/* Pick Style Button - inside card, top right */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onOpenStylePicker()
-          }}
-          className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10 flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors"
-          disabled={isUploadDisabled}
-        >
-          <Palette className="h-3 w-3 sm:h-4 sm:w-4" />
-          <span>{selectedStyleName || 'Pick Style'}</span>
-        </button>
-
-        {uploadedImage ? (
-          <div className="relative aspect-[21/9]">
-            <Image src={uploadedImage || "/placeholder.svg"} alt="Uploaded preview" fill className="object-cover" />
-            <Button
-              variant="secondary"
-              size="icon"
-              className="absolute top-3 right-14 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm hover:bg-background"
-              onClick={(e) => {
-                e.stopPropagation()
-                onClearImage()
-              }}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-            {/* Replace photo label */}
-            <div className="absolute bottom-3 left-3 bg-background/80 backdrop-blur-sm rounded-md px-2 py-1">
-              <span className="text-xs text-foreground">Click to replace photo</span>
+        {photos.length > 0 ? (
+          /* Photo thumbnails + add more + create button */
+          <div className="p-4 sm:p-6">
+            {/* Header row: "1/5 photos  Clear all" on left, "Pick Style" on right */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <p className="text-sm text-muted-foreground">
+                  {photos.length}/{maxPhotos} photos
+                </p>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onClearAll()
+                  }}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Clear all
+                </button>
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpenStylePicker()
+                }}
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Palette className="h-4 w-4" />
+                <span>{selectedStyleName || 'Pick Style'}</span>
+              </button>
             </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-6 sm:py-10 px-4 sm:px-8">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-muted border border-border flex items-center justify-center mb-3 sm:mb-4 relative">
-              {isUploading ? (
-                <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-2 border-primary border-t-transparent" />
-              ) : (
-                <>
-                  <PawPrint className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
-                  <div className="absolute -top-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-primary flex items-center justify-center">
-                    <Plus className="h-2 w-2 sm:h-2.5 sm:w-2.5 text-primary-foreground" />
+
+            {/* Thumbnails row */}
+            <div className="flex gap-3 sm:gap-4 flex-wrap mb-6">
+              {photos.map((photo, index) => (
+                <div
+                  key={index}
+                  className="relative w-[88px] h-[100px] sm:w-[100px] sm:h-[114px] rounded-xl overflow-hidden border border-border bg-muted flex-shrink-0 group"
+                >
+                  <Image
+                    src={photo.preview}
+                    alt={`Photo ${index + 1}`}
+                    fill
+                    className="object-cover"
+                  />
+                  {/* Remove button on hover */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onRemovePhoto(index)
+                    }}
+                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="h-3 w-3 text-white" />
+                  </button>
+                  {/* Number badge — bottom left */}
+                  <div className="absolute bottom-1.5 left-1.5 bg-primary text-primary-foreground text-[10px] font-bold leading-none px-1.5 py-0.5 rounded">
+                    #{index + 1}
                   </div>
-                </>
+                </div>
+              ))}
+
+              {/* Add more — same size as thumbnails, dashed border */}
+              {canAddMore && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    open()
+                  }}
+                  className="w-[88px] h-[100px] sm:w-[100px] sm:h-[114px] rounded-xl border-2 border-dashed border-border hover:border-primary/40 flex items-center justify-center transition-colors"
+                >
+                  <ImagePlus className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
+                </button>
               )}
             </div>
-            
-            <h3 className="text-sm sm:text-base font-semibold text-foreground mb-1 text-center">{content.title}</h3>
-            
-            {/* Upload Progress Bar */}
-            {isUploading && (
-              <div className="w-full max-w-xs mb-2">
-                <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-primary transition-all duration-100 rounded-full"
-                    style={{ width: `${uploadProgress}%` }}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground text-center mt-1">Uploading... {uploadProgress}%</p>
+
+            {/* Create Masterpiece button — green/teal */}
+            <Button
+              onClick={(e) => {
+                e.stopPropagation()
+                onGenerate()
+              }}
+              className="w-full h-12 sm:h-14 text-sm sm:text-base font-semibold gap-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl"
+              size="lg"
+            >
+              <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
+              Create My Masterpiece
+            </Button>
+          </div>
+        ) : (
+          /* Empty state — dropzone */
+          <div className="relative flex flex-col items-center justify-center py-6 sm:py-10 px-4 sm:px-8">
+            {/* Pick Style — top right */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onOpenStylePicker()
+              }}
+              className="absolute top-3 right-3 sm:top-4 sm:right-4 z-10 flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors"
+              disabled={isUploadDisabled}
+            >
+              <Palette className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>{selectedStyleName || 'Pick Style'}</span>
+            </button>
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-muted border border-border flex items-center justify-center mb-3 sm:mb-4 relative">
+              <PawPrint className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
+              <div className="absolute -top-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-primary flex items-center justify-center">
+                <Plus className="h-2 w-2 sm:h-2.5 sm:w-2.5 text-primary-foreground" />
               </div>
-            )}
+            </div>
+
+            <h3 className="text-sm sm:text-base font-semibold text-foreground mb-1 text-center">{content.title}</h3>
 
             {/* Error message */}
-            {uploadError && !isUploading && (
+            {uploadError && (
               <div className="flex items-center gap-1.5 text-destructive mb-2">
                 <AlertCircle className="h-3 w-3" />
                 <p className="text-xs">{uploadError}</p>
               </div>
             )}
 
-            {/* Rotating tips with fade animation - hide when locked */}
-            {!isUploading && !uploadError && areConsentsValid() && (
-              <p 
+            {/* Rotating tips */}
+            {!uploadError && areConsentsValid() && (
+              <p
                 className={`text-xs sm:text-sm text-primary text-center transition-opacity duration-300 ${
                   tipFading ? 'opacity-0' : 'opacity-100'
                 }`}
@@ -526,10 +725,10 @@ export function UploadCard({
               </p>
             )}
 
-            {/* File type hint - hide when locked */}
+            {/* File info + photo count hint */}
             {areConsentsValid() && (
               <p className="text-[10px] sm:text-xs text-muted-foreground mt-2">
-                JPG/PNG only, max 10MB
+                JPG/PNG only, max 10MB — up to {maxPhotos} photos
               </p>
             )}
           </div>
@@ -540,6 +739,7 @@ export function UploadCard({
       <p className="text-[10px] sm:text-xs text-muted-foreground text-center mt-2">
         Uploaded photos are automatically deleted after 24 hours.
       </p>
+
     </div>
   )
 }

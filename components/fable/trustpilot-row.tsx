@@ -7,10 +7,12 @@ interface TrustpilotRowProps {
   activeTab: TabType
 }
 
-const TAB_STATS = {
+const TAB_STATS: Record<TabType, string> = {
   pets: 'Trusted by 10,000+ Pet Owners',
   family: 'Trusted by 5,000+ Families',
   kids: 'Trusted by 3,000+ Parents',
+  couples: 'Trusted by 5,000+ Couples',
+  self: 'Trusted by 8,000+ Customers',
 }
 
 export function TrustpilotRow({ activeTab }: TrustpilotRowProps) {

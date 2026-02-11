@@ -36,7 +36,7 @@ export default function RefundPage() {
 
             <section>
               <h2 className="text-xl font-semibold text-foreground mb-3">How to Request a Refund</h2>
-              <p>To request a refund, please contact our support team at support@petcanvas.art with your order number and reason for the refund request.</p>
+              <p>To request a refund, please contact our support team at info@petcanvas.art with your order number and reason for the refund request.</p>
             </section>
           </div>
         </div>

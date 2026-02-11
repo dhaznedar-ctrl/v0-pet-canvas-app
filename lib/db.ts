@@ -1,4 +1,5 @@
 import { neon } from '@neondatabase/serverless'
+import crypto from 'crypto'
 
 const sql = neon(process.env.DATABASE_URL!)
 
@@ -8,6 +9,9 @@ export { sql }
 export interface User {
   id: number
   email: string
+  name: string | null
+  role: 'user' | 'admin'
+  credits: number
   created_at: Date
 }
 
@@ -25,7 +29,7 @@ export interface Consent {
 export interface Upload {
   id: number
   user_id: number
-  file_key: string
+  file_key: string // R2 object key
   mime: string
   size: number
   expires_at: Date
@@ -35,10 +39,13 @@ export interface Upload {
 export interface Order {
   id: number
   user_id: number
-  stripe_session_id: string
+  iyzico_token: string | null
+  payment_id: string | null
+  stripe_session_id: string | null
   paid: boolean
   amount: number
   currency: string
+  product_id: string | null
   created_at: Date
 }
 
@@ -46,24 +53,44 @@ export interface Job {
   id: number
   user_id: number
   upload_id: number
-  order_id: number
+  order_id: number | null
   style: string
   model: string
   status: 'queued' | 'processing' | 'completed' | 'failed'
   error: string | null
-  output_key: string | null
+  output_key: string | null // R2 URL
   created_at: Date
   updated_at: Date
 }
 
-// Helper to hash IP addresses for GDPR compliance
+export interface PrintOrder {
+  id: number
+  order_id: number
+  job_id: number
+  printful_order_id: number | null
+  size: string
+  status: string
+  tracking_number: string | null
+  tracking_url: string | null
+  created_at: Date
+  updated_at: Date
+}
+
+export interface Credit {
+  id: number
+  user_id: number
+  amount: number
+  reason: string
+  order_id: number | null
+  created_at: Date
+}
+
+// Helper to hash IP addresses for GDPR compliance (SHA-256 with salt)
 export function hashIP(ip: string): string {
-  // Simple hash using Web Crypto API compatible approach
-  let hash = 0
-  for (let i = 0; i < ip.length; i++) {
-    const char = ip.charCodeAt(i)
-    hash = ((hash << 5) - hash) + char
-    hash = hash & hash
-  }
-  return hash.toString(16)
+  const salt = process.env.IP_HASH_SALT || process.env.NEXTAUTH_SECRET || 'petcanvas-default-salt'
+  return crypto
+    .createHash('sha256')
+    .update(`${salt}:${ip}`)
+    .digest('hex')
+    .slice(0, 16)
 }

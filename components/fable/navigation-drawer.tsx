@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { Home, Palette, DollarSign, User, HelpCircle, FileText, ChevronRight } from 'lucide-react'
+import { Home, Palette, DollarSign, HelpCircle, FileText, ChevronRight } from 'lucide-react'
 
 interface NavigationDrawerProps {
   open: boolean
@@ -13,11 +13,11 @@ interface NavigationDrawerProps {
 export function NavigationDrawer({ open, onOpenChange }: NavigationDrawerProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="left" className="w-80 bg-card border-border p-0">
+      <SheetContent side="right" className="w-80 bg-card border-border p-0">
         <SheetHeader className="px-6 py-4 border-b border-border">
           <SheetTitle className="text-left text-foreground">Navigation</SheetTitle>
         </SheetHeader>
-        
+
         <div className="py-4">
           {/* Main Navigation */}
           <nav className="space-y-1 px-3">
@@ -40,7 +40,7 @@ export function NavigationDrawer({ open, onOpenChange }: NavigationDrawerProps) 
                 </AccordionTrigger>
                 <AccordionContent className="pl-10 space-y-1">
                   <Link
-                    href="/create?tab=pets"
+                    href="/?tab=pets"
                     onClick={() => onOpenChange(false)}
                     className="flex items-center gap-2 px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
                   >
@@ -48,7 +48,7 @@ export function NavigationDrawer({ open, onOpenChange }: NavigationDrawerProps) 
                     Pet Portraits
                   </Link>
                   <Link
-                    href="/create?tab=family"
+                    href="/?tab=family"
                     onClick={() => onOpenChange(false)}
                     className="flex items-center gap-2 px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
                   >
@@ -56,7 +56,7 @@ export function NavigationDrawer({ open, onOpenChange }: NavigationDrawerProps) 
                     Family Portraits
                   </Link>
                   <Link
-                    href="/create?tab=kids"
+                    href="/?tab=kids"
                     onClick={() => onOpenChange(false)}
                     className="flex items-center gap-2 px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
                   >
@@ -64,7 +64,7 @@ export function NavigationDrawer({ open, onOpenChange }: NavigationDrawerProps) 
                     {"Children's Portraits"}
                   </Link>
                   <Link
-                    href="/create?tab=pets"
+                    href="/?tab=couples"
                     onClick={() => onOpenChange(false)}
                     className="flex items-center gap-2 px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
                   >
@@ -72,7 +72,7 @@ export function NavigationDrawer({ open, onOpenChange }: NavigationDrawerProps) 
                     Couple Portraits
                   </Link>
                   <Link
-                    href="/create?tab=pets"
+                    href="/?tab=self"
                     onClick={() => onOpenChange(false)}
                     className="flex items-center gap-2 px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
                   >
@@ -90,15 +90,6 @@ export function NavigationDrawer({ open, onOpenChange }: NavigationDrawerProps) 
             >
               <DollarSign className="h-4 w-4" />
               <span>Pricing</span>
-            </Link>
-
-            <Link
-              href="#"
-              onClick={() => onOpenChange(false)}
-              className="flex items-center gap-3 px-3 py-2 text-foreground hover:bg-secondary rounded-lg transition-colors"
-            >
-              <User className="h-4 w-4" />
-              <span>Sign In</span>
             </Link>
           </nav>
 

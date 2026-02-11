@@ -1,68 +1,102 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Loader2, CreditCard, CheckCircle, Package, Truck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-// Order details interface
 interface OrderDetails {
   type: 'download' | 'small_print' | 'large_print'
   size?: string
   price: number
   email?: string
+  productId?: string
+  style?: string
 }
 
 interface CheckoutFlowProps {
   order: OrderDetails
+  authToken?: string | null
   onPaymentSuccess: () => void
   onPaymentFailed: (error: string) => void
   onBack: () => void
 }
 
-type CheckoutState = 'processing' | 'success' | 'print_processing'
+type CheckoutState = 'initializing' | 'form_ready' | 'processing' | 'success' | 'print_processing'
 
 export function CheckoutFlow({
   order,
+  authToken,
   onPaymentSuccess,
   onPaymentFailed,
   onBack,
 }: CheckoutFlowProps) {
-  const [state, setState] = useState<CheckoutState>('processing')
-  const [progress, setProgress] = useState(0)
+  const [state, setState] = useState<CheckoutState>('initializing')
+  const [checkoutHtml, setCheckoutHtml] = useState<string | null>(null)
+  const formContainerRef = useRef<HTMLDivElement>(null)
 
-  // Mock payment processing
+  // Initialize iyzico checkout
   useEffect(() => {
-    if (state !== 'processing') return
+    if (state !== 'initializing') return
 
-    const timer = setTimeout(() => {
-      // TODO: Stripe / IyziCo / PayPal / PayTR integration
-      // Mock: 90% success rate
-      const isSuccess = Math.random() > 0.1
-      
-      if (isSuccess) {
-        if (order.type === 'download') {
-          setState('success')
-          onPaymentSuccess()
-        } else {
-          setState('print_processing')
+    async function initCheckout() {
+      try {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+        if (authToken) headers['Authorization'] = `Bearer ${authToken}`
+
+        const res = await fetch('/api/checkout/create', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            email: order.email,
+            style: order.style || 'renaissance',
+            productId: order.productId || 'pet-portrait-digital',
+          }),
+        })
+
+        const data = await res.json()
+
+        if (!res.ok) {
+          onPaymentFailed(data.error || 'Failed to initialize payment')
+          return
         }
-      } else {
-        onPaymentFailed('Payment was declined. Please try a different payment method.')
+
+        if (data.checkoutFormContent) {
+          setCheckoutHtml(data.checkoutFormContent)
+          setState('form_ready')
+        } else if (data.paymentPageUrl) {
+          window.location.href = data.paymentPageUrl
+        } else {
+          onPaymentFailed('No checkout form returned')
+        }
+      } catch (error) {
+        onPaymentFailed('Failed to connect to payment service')
       }
-    }, 3000)
-
-    const progressTimer = setInterval(() => {
-      setProgress((prev) => Math.min(prev + 10, 90))
-    }, 300)
-
-    return () => {
-      clearTimeout(timer)
-      clearInterval(progressTimer)
     }
-  }, [state, order.type, onPaymentSuccess, onPaymentFailed])
 
-  // Processing State
-  if (state === 'processing') {
+    initCheckout()
+  }, [state, order, onPaymentFailed])
+
+  // Inject iyzico form HTML
+  useEffect(() => {
+    if (state !== 'form_ready' || !checkoutHtml || !formContainerRef.current) return
+
+    formContainerRef.current.innerHTML = checkoutHtml
+
+    // Execute any scripts in the injected HTML
+    const scripts = formContainerRef.current.querySelectorAll('script')
+    scripts.forEach((oldScript) => {
+      const newScript = document.createElement('script')
+      if (oldScript.src) {
+        newScript.src = oldScript.src
+      } else {
+        newScript.textContent = oldScript.textContent
+      }
+      oldScript.parentNode?.replaceChild(newScript, oldScript)
+    })
+  }, [state, checkoutHtml])
+
+  // Initializing State
+  if (state === 'initializing') {
     return (
       <div className="w-full max-w-md mx-auto">
         <div className="rounded-xl border border-border bg-card p-6 sm:p-8 text-center">
@@ -71,33 +105,43 @@ export function CheckoutFlow({
               <Loader2 className="h-6 w-6 sm:h-7 sm:w-7 text-primary animate-spin" />
             </div>
           </div>
-
           <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-2">
-            Redirecting to secure checkout...
+            Preparing secure checkout...
           </h3>
-
           <p className="text-sm text-muted-foreground mb-4">
-            Please wait while we process your order.
+            Setting up your payment form.
           </p>
-
-          {/* Progress bar */}
-          <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mb-2">
-            <div 
-              className="h-full bg-primary transition-all duration-300 rounded-full"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-
           <p className="text-xs text-muted-foreground">
-            Processing {order.type === 'download' ? 'digital download' : `${order.size} print`} - ${order.price}
+            {order.type === 'download' ? 'Digital download' : `${order.size} print`} — ${order.price}
           </p>
-
           <div className="mt-6 pt-4 border-t border-border">
             <p className="text-[10px] sm:text-xs text-muted-foreground flex items-center justify-center gap-1">
               <CreditCard className="h-3 w-3" />
-              Secure payment powered by Stripe
+              Secure payment powered by iyzico
             </p>
-            {/* TODO: Add payment provider logos here */}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // iyzico Form Ready
+  if (state === 'form_ready') {
+    return (
+      <div className="w-full max-w-md mx-auto">
+        <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
+          <h3 className="text-lg font-semibold text-foreground mb-4 text-center">
+            Complete Your Payment
+          </h3>
+          <div ref={formContainerRef} className="min-h-[300px]" />
+          <div className="mt-4 pt-4 border-t border-border flex justify-between items-center">
+            <Button variant="ghost" onClick={onBack} className="text-sm">
+              Back
+            </Button>
+            <p className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1">
+              <CreditCard className="h-3 w-3" />
+              Secure payment via iyzico
+            </p>
           </div>
         </div>
       </div>
@@ -114,19 +158,15 @@ export function CheckoutFlow({
               <CheckCircle className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
             </div>
           </div>
-
           <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-2">
             Payment Successful!
           </h3>
-
           <p className="text-sm text-muted-foreground mb-6">
             Your high-resolution masterpiece is ready to download.
           </p>
-
-          <Button className="w-full bg-primary hover:bg-primary/90 mb-3">
+          <Button className="w-full bg-primary hover:bg-primary/90 mb-3" onClick={onPaymentSuccess}>
             Download Your Masterpiece
           </Button>
-
           <p className="text-xs text-muted-foreground">
             A download link has also been sent to {order.email || 'your email'}.
           </p>
@@ -145,16 +185,12 @@ export function CheckoutFlow({
               <Package className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
             </div>
           </div>
-
           <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-2">
             Your print order is being processed
           </h3>
-
           <p className="text-sm text-muted-foreground mb-4">
-            Production and shipping are handled by our print partner.
+            Production and shipping are handled by our print partner Printful.
           </p>
-
-          {/* Order details */}
           <div className="bg-card rounded-lg p-4 mb-4 text-left border border-border">
             <div className="flex justify-between items-center mb-2">
               <span className="text-sm text-muted-foreground">Size</span>
@@ -166,29 +202,24 @@ export function CheckoutFlow({
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Delivery</span>
-              <span className="text-sm font-medium text-foreground">7-9 business days</span>
+              <span className="text-sm font-medium text-foreground">5-7 business days</span>
             </div>
           </div>
-
-          {/* Shipping tracking (disabled/coming soon) */}
           <div className="bg-muted/50 rounded-lg p-3 mb-4">
-            <div className="flex items-center gap-2 opacity-50">
+            <div className="flex items-center gap-2">
               <Truck className="h-4 w-4 text-muted-foreground" />
               <div className="text-left">
                 <p className="text-xs font-medium text-muted-foreground">Track Shipment</p>
-                <p className="text-[10px] text-muted-foreground">Coming soon - Check email for updates</p>
+                <p className="text-[10px] text-muted-foreground">You&apos;ll receive a tracking email once shipped</p>
               </div>
             </div>
           </div>
-
           <p className="text-xs text-muted-foreground mb-4">
             Order confirmation sent to {order.email || 'your email'}
           </p>
-
-          {/* Digital download included */}
           <div className="pt-4 border-t border-border">
             <p className="text-xs text-primary mb-2">Your order includes a digital download:</p>
-            <Button variant="outline" className="w-full bg-transparent text-sm">
+            <Button variant="outline" className="w-full bg-transparent text-sm" onClick={onPaymentSuccess}>
               Download Digital Version
             </Button>
           </div>

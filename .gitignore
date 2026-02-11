@@ -19,9 +19,19 @@ yarn-error.log*
 # env files
 .env*
 
+# deployment
+deploy.tar.gz
+
+# logs
+logs/
+
 # vercel
 .vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# internal reports
+AUDIT.md
+COMPETITOR-ANALYSIS-REPORT.md

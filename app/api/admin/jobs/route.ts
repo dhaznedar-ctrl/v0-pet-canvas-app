@@ -1,20 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
+import { checkAdminRateLimit, getRequestIP } from '@/lib/api-auth'
+import { isIPBlocked } from '@/lib/security'
+import crypto from 'crypto'
 
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const password = request.headers.get('x-admin-password')
-    const adminPassword = process.env.ADMIN_PASSWORD
+    const ip = getRequestIP(request)
 
-    if (!adminPassword || password !== adminPassword) {
+    // IP block check
+    if (await isIPBlocked(ip)) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+    }
+
+    const rateCheck = checkAdminRateLimit(ip)
+    if (!rateCheck.allowed) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+        { error: 'Too many attempts. Try again later.' },
+        { status: 429 }
       )
     }
 
+    const body = await request.json()
+    const password = body?.password
+    const adminPassword = process.env.ADMIN_PASSWORD
+
+    if (!adminPassword || !password) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Timing-safe comparison
+    const inputBuf = Buffer.from(password)
+    const expectedBuf = Buffer.from(adminPassword)
+    if (inputBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(inputBuf, expectedBuf)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const jobs = await sql`
-      SELECT 
+      SELECT
         j.id,
         u.email,
         j.style,
@@ -31,9 +54,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ jobs })
   } catch (error) {
     console.error('Admin jobs error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch jobs' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 })
   }
 }

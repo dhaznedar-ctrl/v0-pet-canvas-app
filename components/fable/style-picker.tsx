@@ -1,137 +1,161 @@
 'use client'
 
+import { useState } from 'react'
 import Image from 'next/image'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 import { Check, Sparkles } from 'lucide-react'
-
-export interface StyleOption {
-  id: string
-  name: string
-  description: string
-  thumbnail: string
-  colors: string[]
-}
-
-export const STYLE_OPTIONS: StyleOption[] = [
-  {
-    id: 'intelligent',
-    name: 'Intelligent',
-    description: 'Let AI choose the perfect style based on your photos',
-    thumbnail: '',
-    colors: [],
-  },
-  {
-    id: 'baroque-red',
-    name: 'Baroque Red',
-    description: 'Classic royal portrait with rich velvet drapes and golden baroque frames',
-    thumbnail: 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/family-fable-valentine.BzyjY4Xf-iTGpdXOL7xdqD3HTU7r8uMjycuHyVB.png',
-    colors: ['#DC143C', '#DAA520', '#808080', '#2F2F2F', '#C9B896'],
-  },
-  {
-    id: 'florentine',
-    name: 'Florentine Renaissance',
-    description: 'Timeless elegance with refined brushwork and classical composition',
-    thumbnail: 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/family-fable-1.DelWVwG0-AUB10YyXFOF3rctTFwuylhsNWk69t9.jpg',
-    colors: ['#8B4513', '#DAA520', '#2F2F2F', '#C9B896', '#87CEEB'],
-  },
-  {
-    id: 'casati',
-    name: 'Casati',
-    description: 'Theatrical art-deco flair with exotic companions and bold accents',
-    thumbnail: 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/family-fable-2.nTPZjp-m-p8Esfgn9bSRvE3CxDsSBNWjSPSmV0n.jpg',
-    colors: ['#87CEEB', '#2F2F2F', '#DC143C', '#DAA520', '#228B22'],
-  },
-  {
-    id: 'tweed',
-    name: 'Tweed',
-    description: 'Baroque aristocratic style with velvet and ermine, romantic lighting',
-    thumbnail: 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/fable-kids-1.jpg-DWGbglBjg4pL8Xip7Ajk3C1PsUuOps.png',
-    colors: ['#87CEEB', '#DAA520', '#DC143C', '#4169E1', '#C9B896'],
-  },
-  {
-    id: 'storm',
-    name: 'Storm',
-    description: 'Dramatic serpentine motifs with mythological elegance',
-    thumbnail: 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/fable-kids-2.jpg-M86Vd8b3qEY6FuARIq0UzS3ZyXfhq9.png',
-    colors: ['#8B4513', '#228B22', '#808080', '#2F2F2F', '#DAA520'],
-  },
-]
+import { STYLE_PROMPTS, type TabCategory } from '@/lib/style-prompts'
 
 interface StylePickerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   selectedStyle: string | null
   onSelectStyle: (styleId: string) => void
-  activeTab?: 'pets' | 'family' | 'kids'
+  activeTab?: TabCategory
+}
+
+const TAB_LABELS: Record<TabCategory, string> = {
+  pets: 'pet',
+  family: 'family',
+  kids: 'kids',
+  couples: 'couple',
+  self: 'self',
+}
+
+const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || ''
+
+/** Tries static thumbnail → R2 auto-generated thumbnail → color palette fallback */
+function StyleThumbnail({ id, name, thumbnail, colors }: { id: string; name: string; thumbnail?: string; colors: string[] }) {
+  const [imgFailed, setImgFailed] = useState(false)
+
+  // Static thumbnail from config
+  if (thumbnail) {
+    return (
+      <Image
+        src={thumbnail}
+        alt={name}
+        width={64}
+        height={64}
+        className="w-full h-full object-cover"
+      />
+    )
+  }
+
+  // Try R2 auto-generated thumbnail
+  const r2Src = R2_PUBLIC_URL ? `${R2_PUBLIC_URL}/thumbnails/${id}.jpg` : ''
+  if (r2Src && !imgFailed) {
+    return (
+      <img
+        src={r2Src}
+        alt={name}
+        width={64}
+        height={64}
+        className="w-full h-full object-cover"
+        onError={() => setImgFailed(true)}
+      />
+    )
+  }
+
+  // Fallback: color palette
+  return (
+    <div className="w-full h-full flex items-center justify-center">
+      <div className="grid grid-cols-3 gap-0.5 p-2">
+        {colors.slice(0, 6).map((color, i) => (
+          <div
+            key={i}
+            className="w-3.5 h-3.5 rounded-sm"
+            style={{ backgroundColor: color }}
+          />
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export function StylePicker({ open, onOpenChange, selectedStyle, onSelectStyle, activeTab = 'pets' }: StylePickerProps) {
-  const tabLabel = activeTab === 'pets' ? 'pet' : activeTab === 'family' ? 'family' : 'kids'
-  
+  const tabLabel = TAB_LABELS[activeTab] || 'pet'
+
+  // Get themes for the current tab: "intelligent" first, then tab-specific themes
+  const themes = Object.entries(STYLE_PROMPTS)
+    .filter(([, config]) => config.tabs.includes(activeTab))
+    .map(([id, config]) => ({ id, ...config }))
+
+  // Sort: intelligent first
+  themes.sort((a, b) => {
+    if (a.id === 'intelligent') return -1
+    if (b.id === 'intelligent') return 1
+    return 0
+  })
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:w-[420px] bg-[#0d0c0a] border-[#2a2520] p-0">
-        <SheetHeader className="px-6 py-4 border-b border-[#2a2520]">
-          <SheetTitle className="text-left text-white font-semibold">Choose Your Style</SheetTitle>
-          <SheetDescription className="text-left text-[#a09080]">
+      <SheetContent side="bottom" className="bg-card border-border rounded-t-2xl p-0 max-h-[85vh]">
+        <SheetHeader className="px-6 py-4 border-b border-border">
+          <SheetTitle className="text-left text-foreground font-semibold">Choose Your Style</SheetTitle>
+          <SheetDescription className="text-left text-muted-foreground">
             Select an artistic style for your {tabLabel} portrait
           </SheetDescription>
         </SheetHeader>
-        
-        <div className="py-4 px-4 space-y-2 overflow-y-auto max-h-[calc(100vh-120px)]">
-          {STYLE_OPTIONS.map((style) => (
-            <button
-              key={style.id}
-              onClick={() => {
-                onSelectStyle(style.id)
-                onOpenChange(false)
-              }}
-              className={cn(
-                'w-full flex items-start gap-4 p-3 rounded-xl transition-all text-left',
-                'hover:bg-[#1a1815]',
-                selectedStyle === style.id && 'bg-[#1a1815] ring-2 ring-[#2dd4bf]',
-                style.id === 'intelligent' && 'border border-[#2dd4bf]/50 bg-[#1a1815]'
-              )}
-            >
-              {/* Thumbnail or AI Icon */}
-              {style.id === 'intelligent' ? (
-                <div className="w-16 h-16 rounded-lg bg-[#2dd4bf]/20 flex items-center justify-center flex-shrink-0">
-                  <Sparkles className="h-8 w-8 text-[#2dd4bf]" />
-                </div>
-              ) : (
-                <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 relative">
-                  <Image
-                    src={style.thumbnail || "/placeholder.svg"}
-                    alt={style.name}
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-              )}
-              
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="font-semibold text-white">{style.name}</h3>
-                  {selectedStyle === style.id && (
-                    <Check className="h-4 w-4 text-[#2dd4bf]" />
+
+        <div className="py-4 px-4 space-y-2 overflow-y-auto max-h-[calc(85vh-120px)]">
+          {themes.map((theme) => {
+            const isIntelligent = theme.id === 'intelligent'
+            const isSelected = selectedStyle === theme.id || (!selectedStyle && isIntelligent)
+
+            return (
+              <button
+                key={theme.id}
+                onClick={() => {
+                  onSelectStyle(theme.id)
+                  onOpenChange(false)
+                }}
+                className={cn(
+                  'w-full flex items-start gap-4 p-3 rounded-xl transition-all text-left',
+                  'hover:bg-secondary/60',
+                  isSelected && 'bg-secondary ring-2 ring-emerald-500'
+                )}
+              >
+                {/* Thumbnail or Intelligent icon */}
+                <div className={cn(
+                  'w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center',
+                  isIntelligent ? 'bg-emerald-500/10' : 'bg-secondary'
+                )}>
+                  {isIntelligent ? (
+                    <Sparkles className="h-8 w-8 text-emerald-500" />
+                  ) : (
+                    <StyleThumbnail
+                      id={theme.id}
+                      name={theme.name}
+                      thumbnail={theme.thumbnail}
+                      colors={theme.colors}
+                    />
                   )}
                 </div>
-                <p className="text-sm text-[#a09080] mb-2 line-clamp-2">{style.description}</p>
-                {style.colors.length > 0 && (
-                  <div className="flex gap-1.5">
-                    {style.colors.map((color, index) => (
-                      <div
-                        key={index}
-                        className="w-4 h-4 rounded-full border border-[#3a3530]"
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-semibold text-foreground">{theme.name}</h3>
+                    {isSelected && (
+                      <Check className="h-4 w-4 text-emerald-500" />
+                    )}
                   </div>
-                )}
-              </div>
-            </button>
-          ))}
+                  <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{theme.description}</p>
+                  {!isIntelligent && theme.colors.length > 0 && (
+                    <div className="flex gap-1.5">
+                      {theme.colors.map((color, index) => (
+                        <div
+                          key={index}
+                          className="w-4 h-4 rounded-full border border-border"
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </button>
+            )
+          })}
         </div>
       </SheetContent>
     </Sheet>

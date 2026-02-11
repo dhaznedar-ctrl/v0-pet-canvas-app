@@ -1,25 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql, hashIP } from '@/lib/db'
+import { createApiToken, isValidEmail, getRequestIP } from '@/lib/api-auth'
+import { consentSchema, validateWithHoneypot } from '@/lib/validation'
+import { isIPBlocked, logSecurityEvent } from '@/lib/security'
+import { checkRateLimit } from '@/lib/rate-limit'
+import { verifyTurnstile } from '@/lib/turnstile'
 
 const CONSENT_VERSION = 'v1.0'
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { email, acceptedTermsA, acceptedTermsB } = body
+    const ip = getRequestIP(request)
+    const ipHash = hashIP(ip)
 
-    if (!email || !acceptedTermsA || !acceptedTermsB) {
+    // IP block check
+    if (await isIPBlocked(ip)) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+    }
+
+    // Rate limit
+    const rateLimit = await checkRateLimit(ip, '/api/consent')
+    if (!rateLimit.success) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429 }
       )
     }
 
-    // Get IP and user agent for GDPR-compliant tracking
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 
-               request.headers.get('x-real-ip') || 
-               'unknown'
-    const ipHash = hashIP(ip)
+    const body = await request.json()
+
+    // Zod validation + honeypot
+    const validation = validateWithHoneypot(consentSchema, body)
+    if (!validation.success) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+    if (validation.isBot) {
+      await logSecurityEvent('honeypot_triggered', ipHash, null, { endpoint: '/api/consent' })
+      return NextResponse.json({ success: true, userId: 0, authToken: '' })
+    }
+
+    const { email, turnstileToken } = validation.data
+
+    // Turnstile verification
+    const turnstileResult = await verifyTurnstile(turnstileToken, ip)
+    if (!turnstileResult.success) {
+      await logSecurityEvent('turnstile_fail', ipHash, null, { endpoint: '/api/consent' })
+      return NextResponse.json({ error: 'Verification failed' }, { status: 403 })
+    }
+
+    // Validate email format (allow guest-* auto-generated emails)
+    if (!email.startsWith('guest-') && !isValidEmail(email)) {
+      return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
+    }
+
     const userAgent = request.headers.get('user-agent') || 'unknown'
 
     // Create or get user
@@ -40,20 +73,20 @@ export async function POST(request: NextRequest) {
     // Record consent
     await sql`
       INSERT INTO consents (
-        user_id, ip_hash, user_agent, consent_version, 
+        user_id, ip_hash, user_agent, consent_version,
         accepted_terms_a, accepted_terms_b
       ) VALUES (
         ${userId}, ${ipHash}, ${userAgent}, ${CONSENT_VERSION},
-        ${acceptedTermsA}, ${acceptedTermsB}
+        ${true}, ${true}
       )
     `
 
-    return NextResponse.json({ success: true, userId })
+    // Generate signed API token for subsequent requests
+    const authToken = createApiToken(userId, email)
+
+    return NextResponse.json({ success: true, userId, authToken })
   } catch (error) {
     console.error('Consent error:', error)
-    return NextResponse.json(
-      { error: 'Failed to save consent' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 })
   }
 }

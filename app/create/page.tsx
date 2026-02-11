@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { TopBar, type TabType } from '@/components/fable/top-bar'
-import { StylePicker, STYLE_OPTIONS } from '@/components/fable/style-picker'
+import { StylePicker } from '@/components/fable/style-picker'
+import { STYLE_PROMPTS } from '@/lib/style-prompts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -12,6 +13,18 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { toast } from '@/hooks/use-toast'
 import { ArrowRight, ArrowLeft, Palette, Loader2, Info } from 'lucide-react'
+
+export interface CreateFormData {
+  file: File | null
+  filePreview: string | null
+  style: string
+  email: string
+  acceptedTermsA: boolean
+  acceptedTermsB: boolean
+  paid: boolean
+  orderId: string | null
+  jobId: string | null
+}
 
 type Step = 'preview' | 'consent' | 'generating'
 
@@ -29,8 +42,9 @@ export default function CreatePage() {
   const [usageConsent, setUsageConsent] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [generationProgress, setGenerationProgress] = useState(0)
+  const [authToken, setAuthToken] = useState<string | null>(null)
 
-  const selectedStyleData = selectedStyle ? STYLE_OPTIONS.find((s) => s.id === selectedStyle) : null
+  const selectedStyleData = selectedStyle ? { id: selectedStyle, name: STYLE_PROMPTS[selectedStyle]?.name || selectedStyle } : null
 
   useEffect(() => {
     // Load from sessionStorage
@@ -72,14 +86,14 @@ export default function CreatePage() {
     setIsSubmitting(true)
 
     try {
-      // Submit consent
+      // Submit consent and get auth token
       const consentResponse = await fetch('/api/consent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
-          ownershipConsent,
-          usageConsent,
+          acceptedTermsA: ownershipConsent,
+          acceptedTermsB: usageConsent,
         }),
       })
 
@@ -87,15 +101,21 @@ export default function CreatePage() {
         throw new Error('Failed to submit consent')
       }
 
-      const { consentId } = await consentResponse.json()
+      const consentData = await consentResponse.json()
+      const token = consentData.authToken || null
+      setAuthToken(token)
+
+      const authHeaders: Record<string, string> = token
+        ? { Authorization: `Bearer ${token}` }
+        : {}
 
       // Upload image
       const uploadResponse = await fetch('/api/upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({
           image: uploadedImage,
-          consentId,
+          consentId: consentData.userId,
         }),
       })
 
@@ -111,11 +131,12 @@ export default function CreatePage() {
 
       const generateResponse = await fetch('/api/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({
+          email,
           uploadId,
-          styleId: selectedStyle,
-          consentId,
+          style: selectedStyle,
+          tab: activeTab,
         }),
       })
 
@@ -130,7 +151,7 @@ export default function CreatePage() {
       while (!completed) {
         await new Promise((resolve) => setTimeout(resolve, 2000))
 
-        const statusResponse = await fetch(`/api/jobs/${jobId}`)
+        const statusResponse = await fetch(`/api/jobs/${jobId}`, { headers: authHeaders })
         const jobData = await statusResponse.json()
 
         if (jobData.status === 'completed') {

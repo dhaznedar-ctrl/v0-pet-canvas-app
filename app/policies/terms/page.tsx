@@ -46,7 +46,7 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-xl font-semibold text-foreground mb-3">6. Contact</h2>
-              <p>For any questions regarding these terms, please contact us at support@petcanvas.art</p>
+              <p>For any questions regarding these terms, please contact us at info@petcanvas.art</p>
             </section>
           </div>
         </div>
