@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Download, Layers, Frame, Check, Truck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useCurrency } from '@/components/fable/currency-provider'
 
 export interface PrintOrderDetails {
   size: string
@@ -69,6 +70,7 @@ export function PricingCards({ onDownload, onOrderPrint }: PricingCardsProps) {
   const [canvasSize, setCanvasSize] = useState(CANVAS_SIZES[0].size)
   const [canvasFrame, setCanvasFrame] = useState('stretched')
   const [countdown, setCountdown] = useState(20 * 60) // 20 minutes in seconds
+  const { formatDollars, convert, symbol, isTRY } = useCurrency()
 
   // Countdown timer
   React.useEffect(() => {
@@ -143,8 +145,8 @@ export function PricingCards({ onDownload, onOrderPrint }: PricingCardsProps) {
           <h3 className="font-serif text-xl text-center text-foreground mb-2">Digital Portrait</h3>
 
           <div className="text-center mb-1">
-            <span className="text-muted-foreground line-through text-sm">$39</span>
-            <span className="text-3xl font-bold text-foreground ml-2">$29</span>
+            <span className="text-muted-foreground line-through text-sm">{formatDollars(39)}</span>
+            <span className="text-3xl font-bold text-foreground ml-2">{formatDollars(29)}</span>
           </div>
 
           <p className="text-center text-muted-foreground text-sm mb-4">
@@ -191,8 +193,8 @@ export function PricingCards({ onDownload, onOrderPrint }: PricingCardsProps) {
           <h3 className="font-serif text-xl text-center text-foreground mb-4">Fine Art Print</h3>
 
           <div className="text-center mb-4">
-            <span className="text-muted-foreground line-through text-sm">${posterOldPrice}</span>
-            <span className="text-3xl font-bold text-foreground ml-2">${posterPrice}</span>
+            <span className="text-muted-foreground line-through text-sm">{formatDollars(posterOldPrice)}</span>
+            <span className="text-3xl font-bold text-foreground ml-2">{formatDollars(posterPrice)}</span>
           </div>
 
           <p className="text-center text-muted-foreground text-sm mb-6">
@@ -209,7 +211,7 @@ export function PricingCards({ onDownload, onOrderPrint }: PricingCardsProps) {
               <SelectContent>
                 {POSTER_SIZES.map((s) => (
                   <SelectItem key={s.size} value={s.size}>
-                    {s.size} — ${s.price}
+                    {s.size} — {formatDollars(s.price)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -256,10 +258,10 @@ export function PricingCards({ onDownload, onOrderPrint }: PricingCardsProps) {
                   {posterFreeShipping ? (
                     <>
                       <span className="font-semibold text-foreground">Free Shipping</span>
-                      <span className="text-muted-foreground"> ($20 value)</span>
+                      <span className="text-muted-foreground"> ({formatDollars(20)} value)</span>
                     </>
                   ) : (
-                    <span className="text-muted-foreground">Free shipping over ${FREE_SHIPPING_THRESHOLD}</span>
+                    <span className="text-muted-foreground">Free shipping over {formatDollars(FREE_SHIPPING_THRESHOLD)}</span>
                   )}
                 </p>
                 <p className="text-xs text-muted-foreground">Delivery: 7-9 days</p>
@@ -294,8 +296,8 @@ export function PricingCards({ onDownload, onOrderPrint }: PricingCardsProps) {
           <h3 className="font-serif text-xl text-center text-foreground mb-4">Stretched Canvas</h3>
 
           <div className="text-center mb-4">
-            <span className="text-muted-foreground line-through text-sm">${canvasOldPrice}</span>
-            <span className="text-3xl font-bold text-accent ml-2">${canvasPrice}</span>
+            <span className="text-muted-foreground line-through text-sm">{formatDollars(canvasOldPrice)}</span>
+            <span className="text-3xl font-bold text-accent ml-2">{formatDollars(canvasPrice)}</span>
           </div>
 
           <p className="text-center text-muted-foreground text-sm mb-6">
@@ -312,7 +314,7 @@ export function PricingCards({ onDownload, onOrderPrint }: PricingCardsProps) {
               <SelectContent>
                 {CANVAS_SIZES.map((s) => (
                   <SelectItem key={s.size} value={s.size}>
-                    {s.size} — ${s.price}
+                    {s.size} — {formatDollars(s.price)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -359,10 +361,10 @@ export function PricingCards({ onDownload, onOrderPrint }: PricingCardsProps) {
                   {canvasFreeShipping ? (
                     <>
                       <span className="font-semibold text-foreground">Free Shipping</span>
-                      <span className="text-muted-foreground"> ($20 value)</span>
+                      <span className="text-muted-foreground"> ({formatDollars(20)} value)</span>
                     </>
                   ) : (
-                    <span className="text-muted-foreground">Free shipping over ${FREE_SHIPPING_THRESHOLD}</span>
+                    <span className="text-muted-foreground">Free shipping over {formatDollars(FREE_SHIPPING_THRESHOLD)}</span>
                   )}
                 </p>
                 <p className="text-xs text-muted-foreground">Delivery: 7-9 days</p>

@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect, Suspense, useMemo } from 'rea
 import { useSearchParams } from 'next/navigation'
 
 import { TopBar, type TabType } from '@/components/fable/top-bar'
-import { UploadCard } from '@/components/fable/upload-card'
+import { UploadCard, type Variation } from '@/components/fable/upload-card'
 import { TrustpilotRow } from '@/components/fable/trustpilot-row'
 import { ExampleGallery } from '@/components/fable/example-gallery'
 import { StylePicker } from '@/components/fable/style-picker'
@@ -17,6 +17,23 @@ import { ChevronRight } from 'lucide-react'
 import { FaqSection } from '@/components/fable/faq-section'
 import { StepsSection } from '@/components/fable/steps-section'
 import { TurnstileWidget } from '@/components/fable/turnstile-widget'
+import { useCurrency } from '@/components/fable/currency-provider'
+import { OnboardingTooltips } from '@/components/fable/onboarding-tooltips'
+
+// Auto-save constants
+const LOCAL_STORAGE_KEY = 'petcanvas_saved_state'
+const SAVED_STATE_EXPIRY_MS = 48 * 60 * 60 * 1000 // 48 hours
+
+interface SavedState {
+  activeTab: TabType
+  userEmail: string | null
+  petName: string
+  selectedStyle: string | null
+  currentJobId: number | null
+  generatedImage: string | null
+  authToken: string | null
+  savedAt: number
+}
 
 // App state types for state machine
 type AppState =
@@ -46,6 +63,8 @@ interface OrderDetails {
   price: number
   email?: string
   productId?: string
+  style?: string
+  jobId?: number
 }
 
 interface HeroContent {
@@ -72,7 +91,7 @@ const HERO_CONTENT: Record<TabType, HeroContent> = {
       'a Classical Oil Painting',
     ],
     rotatingSuffix: '',
-    pricing: 'From $29 · Ready in 2 minutes',
+    pricing: '',
     subtitle: 'Preview for free. Only pay if you love it.',
   },
   family: {
@@ -88,7 +107,7 @@ const HERO_CONTENT: Record<TabType, HeroContent> = {
       'One Renaissance Moment.',
     ],
     rotatingSuffix: '',
-    pricing: 'From $29 · Ready in 2 minutes',
+    pricing: '',
     subtitle: 'Preview for free. Only pay if you love it.',
   },
   kids: {
@@ -104,7 +123,7 @@ const HERO_CONTENT: Record<TabType, HeroContent> = {
       'a Fairy-tale Portrait',
     ],
     rotatingSuffix: '',
-    pricing: 'From $29 · Ready in 2 minutes',
+    pricing: '',
     subtitle: 'Preview for free. Only pay if you love it.',
   },
   couples: {
@@ -120,7 +139,7 @@ const HERO_CONTENT: Record<TabType, HeroContent> = {
       'One Renaissance Moment.',
     ],
     rotatingSuffix: '',
-    pricing: 'From $29 · Ready in 2 minutes',
+    pricing: '',
     subtitle: 'Preview for free. Only pay if you love it.',
   },
   self: {
@@ -136,10 +155,16 @@ const HERO_CONTENT: Record<TabType, HeroContent> = {
       'Classical Portrait',
     ],
     rotatingSuffix: '',
-    pricing: 'From $29 · Ready in 2 minutes',
+    pricing: '',
     subtitle: 'Preview for free. Only pay if you love it.',
   },
 }
+
+const SUBTITLE_ROTATION = [
+  'From $29 · Ready in 2 minutes',
+  'No credit card or registration required',
+  'Preview for free. Only pay if you love it.',
+]
 
 const MAX_PHOTOS = 5
 
@@ -153,6 +178,7 @@ export default function HomePage() {
 
 function HomePageContent() {
   const searchParams = useSearchParams()
+  const { format, formatDollars } = useCurrency()
 
   // Core state
   const [activeTab, setActiveTab] = useState<TabType>('pets')
@@ -186,6 +212,7 @@ function HomePageContent() {
   // Image state — now supports multiple photos
   const [photos, setPhotos] = useState<UploadedPhoto[]>([])
   const [generatedImage, setGeneratedImage] = useState<string | null>(null)
+  const [variations, setVariations] = useState<Variation[]>([])
 
   // Style state
   const [selectedStyle, setSelectedStyle] = useState<string | null>(null)
@@ -209,6 +236,13 @@ function HomePageContent() {
   // Turnstile token
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
 
+  // Rate limit reset time
+  const [rateLimitResetTime, setRateLimitResetTime] = useState<number | undefined>(undefined)
+
+  // Recovery banner
+  const [showRecoveryBanner, setShowRecoveryBanner] = useState(false)
+  const [savedStateData, setSavedStateData] = useState<SavedState | null>(null)
+
   const heroContent = HERO_CONTENT[activeTab]
   const selectedStyleName = selectedStyle && selectedStyle !== 'intelligent'
     ? (STYLE_PROMPTS[selectedStyle]?.name || null)
@@ -217,6 +251,10 @@ function HomePageContent() {
   // Rotating hero text animation
   const [rotatingIndex, setRotatingIndex] = useState(0)
   const [rotatingFading, setRotatingFading] = useState(false)
+
+  // Rotating subtitle animation
+  const [subtitleIndex, setSubtitleIndex] = useState(0)
+  const [subtitleFading, setSubtitleFading] = useState(false)
 
   useEffect(() => {
     setRotatingIndex(0)
@@ -236,6 +274,84 @@ function HomePageContent() {
 
     return () => clearInterval(interval)
   }, [appState, generatedImage, heroContent.rotating.length])
+
+  // Subtitle rotation animation
+  useEffect(() => {
+    if (appState !== 'upload' || generatedImage) return
+
+    const interval = setInterval(() => {
+      setSubtitleFading(true)
+      setTimeout(() => {
+        setSubtitleIndex((prev) => (prev + 1) % SUBTITLE_ROTATION.length)
+        setSubtitleFading(false)
+      }, 400)
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [appState, generatedImage])
+
+  // Auto-save state to localStorage (300ms debounce)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const state: SavedState = {
+          activeTab,
+          userEmail,
+          petName,
+          selectedStyle,
+          currentJobId,
+          generatedImage,
+          authToken,
+          savedAt: Date.now(),
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state))
+      } catch {
+        // localStorage may be unavailable
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [activeTab, userEmail, petName, selectedStyle, currentJobId, generatedImage, authToken])
+
+  // Restore state from localStorage on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LOCAL_STORAGE_KEY)
+      if (!raw) return
+      const saved: SavedState = JSON.parse(raw)
+      if (Date.now() - saved.savedAt > SAVED_STATE_EXPIRY_MS) {
+        localStorage.removeItem(LOCAL_STORAGE_KEY)
+        return
+      }
+      // Only show recovery if there's meaningful state to restore
+      if (saved.generatedImage || saved.currentJobId || saved.userEmail) {
+        setSavedStateData(saved)
+        setShowRecoveryBanner(true)
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }, [])
+
+  const handleRestoreState = () => {
+    if (!savedStateData) return
+    setActiveTab(savedStateData.activeTab)
+    if (savedStateData.userEmail) setUserEmail(savedStateData.userEmail)
+    if (savedStateData.petName) setPetName(savedStateData.petName)
+    if (savedStateData.selectedStyle) setSelectedStyle(savedStateData.selectedStyle)
+    if (savedStateData.currentJobId) setCurrentJobId(savedStateData.currentJobId)
+    if (savedStateData.generatedImage) {
+      setGeneratedImage(savedStateData.generatedImage)
+      setAppState('preview')
+    }
+    if (savedStateData.authToken) setAuthToken(savedStateData.authToken)
+    setShowRecoveryBanner(false)
+    setSavedStateData(null)
+  }
+
+  const handleDismissRecovery = () => {
+    setShowRecoveryBanner(false)
+    setSavedStateData(null)
+  }
 
   // Get current step for indicator
   const getCurrentStep = (): 'upload' | 'preview' | 'download' => {
@@ -318,6 +434,12 @@ function HomePageContent() {
         uploadIds.push(uploadData.uploadId)
       }
 
+      // Save upload IDs back to photo state so retries reuse the same upload_id
+      setPhotos(prev => prev.map((photo, idx) => ({
+        ...photo,
+        uploadId: uploadIds[idx] ?? photo.uploadId,
+      })))
+
       // Step 3: Start generation with all upload IDs
       // Auto-select style based on tab
       const style = resolveStyle(selectedStyle || 'intelligent', activeTab)
@@ -332,6 +454,7 @@ function HomePageContent() {
         if (genRes.status === 429 && genData.canPurchaseCredits) {
           setAppState('rate_limited')
           setRemainingGenerations(0)
+          if (genData.resetAt) setRateLimitResetTime(genData.resetAt)
           return
         }
         if (genRes.status === 429 && genData.retryAfter) {
@@ -379,6 +502,9 @@ function HomePageContent() {
           if (jobData.status === 'completed' && jobData.outputUrl) {
             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
             setGeneratedImage(jobData.outputUrl)
+            if (jobData.variations) {
+              setVariations(jobData.variations)
+            }
             setAppState('preview')
           } else if (jobData.status === 'failed') {
             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
@@ -409,7 +535,7 @@ function HomePageContent() {
     }
 
     setAppState('generating')
-    setGeneratedImage(null)
+    // Keep generatedImage — overlay shows on top of existing preview
     setRemainingGenerations((prev) => Math.max(0, prev - 1))
 
     try {
@@ -450,6 +576,12 @@ function HomePageContent() {
         uploadIds.push(uploadData.uploadId)
       }
 
+      // Save upload IDs back to photo state so retries reuse the same upload_id
+      setPhotos(prev => prev.map((photo, idx) => ({
+        ...photo,
+        uploadId: uploadIds[idx] ?? photo.uploadId,
+      })))
+
       const defaultStyle = activeTab === 'pets' ? 'royal-portrait' : activeTab === 'kids' ? 'kids-portrait' : 'family-portrait'
       const style = selectedStyle || defaultStyle
 
@@ -463,6 +595,7 @@ function HomePageContent() {
         if (genRes.status === 429 && genData.canPurchaseCredits) {
           setAppState('rate_limited')
           setRemainingGenerations(0)
+          if (genData.resetAt) setRateLimitResetTime(genData.resetAt)
           return
         }
         if (genRes.status === 429 && genData.retryAfter) {
@@ -506,6 +639,9 @@ function HomePageContent() {
           if (jobData.status === 'completed' && jobData.outputUrl) {
             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
             setGeneratedImage(jobData.outputUrl)
+            if (jobData.variations) {
+              setVariations(jobData.variations)
+            }
             setAppState('preview')
           } else if (jobData.status === 'failed') {
             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
@@ -527,14 +663,22 @@ function HomePageContent() {
     }
   }, [photos, remainingGenerations, userEmail, authToken, selectedStyle, activeTab, visitorFingerprint, turnstileToken])
 
+  // Handle selecting a variation
+  const handleSelectVariation = useCallback((variation: Variation) => {
+    setGeneratedImage(variation.outputUrl)
+    setCurrentJobId(variation.jobId)
+  }, [])
+
   // Handle clear all
   const handleClearAll = () => {
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
     setPhotos([])
     setGeneratedImage(null)
+    setVariations([])
     setCurrentJobId(null)
     setAppState('upload')
     setErrorMessage(null)
+    try { localStorage.removeItem(LOCAL_STORAGE_KEY) } catch {}
   }
 
   // Handle generation complete — now a no-op since polling handles it
@@ -548,6 +692,8 @@ function HomePageContent() {
       type: 'download',
       price: 39,
       productId: 'credit-pack-10',
+      email: userEmail || undefined,
+      style: resolveStyle(selectedStyle || 'intelligent', activeTab),
     })
     setAppState('checkout')
   }
@@ -557,7 +703,7 @@ function HomePageContent() {
     handleDownload()
   }
 
-  // Handle retry from any error state
+  // Handle retry — re-generate with same photos when in preview, otherwise go back to upload
   const handleRetry = () => {
     if (appState === 'upload_failed') {
       setAppState('upload')
@@ -569,9 +715,15 @@ function HomePageContent() {
     } else if (appState === 'payment_failed') {
       if (currentOrder) {
         setAppState('checkout')
+      } else if (generatedImage) {
+        setAppState('preview')
+        setErrorMessage(null)
       }
     } else if (appState === 'rate_limited') {
       setAppState('preview')
+    } else if (appState === 'preview' && photos.length > 0) {
+      // Re-generate in-place — keep generatedImage visible with overlay
+      handleGenerate()
     } else {
       setGeneratedImage(null)
       setPhotos([])
@@ -581,9 +733,16 @@ function HomePageContent() {
 
   // Handle go back
   const handleGoBack = () => {
+    // From rate_limited or payment_failed with a generated image → return to preview
+    if (generatedImage && (appState === 'rate_limited' || appState === 'payment_failed')) {
+      setAppState('preview')
+      setErrorMessage(null)
+      return
+    }
     setAppState('upload')
     setErrorMessage(null)
     setGeneratedImage(null)
+    setVariations([])
     setPhotos([])
   }
 
@@ -605,6 +764,9 @@ function HomePageContent() {
       type: 'download',
       price: 29,
       productId: productMap[activeTab],
+      email: userEmail || undefined,
+      style: resolveStyle(selectedStyle || 'intelligent', activeTab),
+      jobId: currentJobId || undefined,
     })
     setAppState('checkout')
   }
@@ -617,17 +779,23 @@ function HomePageContent() {
       frame: details.frame,
       price: details.price,
       productId: details.type === 'poster' ? 'poster-print' : 'canvas-print',
+      email: userEmail || undefined,
+      style: resolveStyle(selectedStyle || 'intelligent', activeTab),
+      jobId: currentJobId || undefined,
     })
     setAppState('checkout')
   }
 
   // Handle payment success
   const handlePaymentSuccess = () => {
-    // If credits were purchased, reset generation counter and go back to upload
+    // Clear saved state on successful payment
+    try { localStorage.removeItem(LOCAL_STORAGE_KEY) } catch {}
+    // If credits were purchased, reset generation counter and return to preview or upload
     if (currentOrder?.productId === 'credit-pack-10') {
       setRemainingGenerations(10) // Credits purchased, allow more generations
       setCurrentOrder(null)
-      setAppState('upload')
+      // Return to preview if the user has a generated image, otherwise to upload
+      setAppState(generatedImage ? 'preview' : 'upload')
       return
     }
     setAppState('payment_success')
@@ -652,6 +820,7 @@ function HomePageContent() {
             onContactSupport={handleContactSupport}
             onBuyCredits={handleBuyCredits}
             onBuySinglePortrait={generatedImage ? handleBuySinglePortrait : undefined}
+            resetTime={rateLimitResetTime}
           />
         </div>
       )
@@ -667,6 +836,7 @@ function HomePageContent() {
           <CheckoutFlow
             order={currentOrder}
             authToken={authToken}
+            turnstileToken={turnstileToken}
             onPaymentSuccess={handlePaymentSuccess}
             onPaymentFailed={handlePaymentFailed}
             onBack={() => setAppState('preview')}
@@ -702,6 +872,29 @@ function HomePageContent() {
               Download or Order Print
             </span>
           </div>
+
+          {/* Recovery Banner */}
+          {showRecoveryBanner && (
+            <div className="mb-4 p-3 sm:p-4 rounded-xl border border-primary/30 bg-primary/5 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <p className="text-sm text-foreground text-center sm:text-left">
+                You have unsaved progress. Want to pick up where you left off?
+              </p>
+              <div className="flex gap-2 flex-shrink-0">
+                <button
+                  onClick={handleRestoreState}
+                  className="px-4 py-1.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  Restore
+                </button>
+                <button
+                  onClick={handleDismissRecovery}
+                  className="px-4 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Hero Section */}
           <div className="text-center mb-3 sm:mb-8">
@@ -751,15 +944,25 @@ function HomePageContent() {
               )}
             </h1>
             {!generatedImage && appState === 'upload' && (
-              <>
-                <p className="text-muted-foreground text-xs sm:text-sm tracking-wide">{heroContent.pricing}</p>
-                <p className="text-emerald-600 font-semibold text-xs sm:text-sm mt-1">{heroContent.subtitle}</p>
-              </>
+              <p
+                className={`text-emerald-600 font-semibold text-xs sm:text-sm tracking-wide transition-all duration-400 ${
+                  subtitleFading ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'
+                }`}
+              >
+                {SUBTITLE_ROTATION[subtitleIndex]}
+              </p>
             )}
           </div>
 
           {/* Error States */}
           {renderErrorState()}
+          {/* Turnstile for rate_limited — get a fresh token before credit purchase */}
+          {appState === 'rate_limited' && (
+            <TurnstileWidget
+              onToken={(token) => setTurnstileToken(token)}
+              onExpire={() => setTurnstileToken(null)}
+            />
+          )}
 
           {/* Checkout Flow */}
           {renderCheckoutFlow()}
@@ -780,6 +983,7 @@ function HomePageContent() {
                 isGenerating={appState === 'generating'}
                 generatedImage={generatedImage}
                 onRetry={handleRetry}
+                onUploadNew={handleGoBack}
                 onCustomEdit={handleCustomEdit}
                 onGenerationComplete={handleGenerationComplete}
                 remainingCredits={remainingGenerations}
@@ -787,6 +991,10 @@ function HomePageContent() {
                 onUserEmailChange={(email) => setUserEmail(email)}
                 petName={petName}
                 onPetNameChange={setPetName}
+                variations={variations}
+                onSelectVariation={handleSelectVariation}
+                selectedStyle={selectedStyle}
+                onStyleChange={setSelectedStyle}
               />
               {/* Turnstile — renders below upload card, invisible in managed mode unless challenge needed */}
               {appState === 'upload' && !generatedImage && (
@@ -798,15 +1006,15 @@ function HomePageContent() {
             </div>
           )}
 
-          {/* Pricing Cards - show after generation in preview state */}
-          {generatedImage && appState === 'preview' && (
+          {/* Pricing Cards - show after generation, stay visible during regeneration */}
+          {generatedImage && (appState === 'preview' || appState === 'generating') && (
             <div id="pricing-section">
               <PricingCards onDownload={handleDownload} onOrderPrint={handleOrderPrint} />
             </div>
           )}
 
-          {/* Result Section with FAQ - show after generation */}
-          {generatedImage && appState === 'preview' && (
+          {/* Result Section with FAQ - show after generation, stay visible during regeneration */}
+          {generatedImage && (appState === 'preview' || appState === 'generating') && (
             <ResultSection generatedImage={generatedImage} onRetry={handleRetry} jobId={currentJobId} />
           )}
 
@@ -851,6 +1059,9 @@ function HomePageContent() {
           </p>
         </div>
       </footer>
+
+      {/* Onboarding Tooltips — only in upload state without a generated image */}
+      <OnboardingTooltips enabled={appState === 'upload' && !generatedImage} />
 
       {/* Style Picker Sheet */}
       <StylePicker

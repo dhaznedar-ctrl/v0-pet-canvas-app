@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Download, Layers, Frame, Check, Gift, Clock, Truck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FaqSection } from '@/components/fable/faq-section'
+import { useCurrency } from '@/components/fable/currency-provider'
 
 const POSTER_SIZES = [
   { value: '8x10', label: '8" x 10"', price: 29 },
@@ -51,6 +52,7 @@ function calculatePrice(basePrice: number, frameId: string, multiplier: number):
 }
 
 export default function FormatPage() {
+  const { formatDollars } = useCurrency()
   const router = useRouter()
   const searchParams = useSearchParams()
   const jobId = searchParams.get('jobId')
@@ -163,7 +165,7 @@ export default function FormatPage() {
               </div>
 
               <h3 className="text-xl font-semibold text-center text-foreground mb-1">Instant Masterpiece</h3>
-              <p className="text-3xl font-bold text-center text-foreground mb-2">$19</p>
+              <p className="text-3xl font-bold text-center text-foreground mb-2">{formatDollars(19)}</p>
 
               <div className="flex items-center justify-center gap-1.5 text-sm text-accent mb-4">
                 <Clock className="h-3.5 w-3.5" />
@@ -253,7 +255,7 @@ export default function FormatPage() {
                 <Truck className="h-4 w-4" />
                 <span>
                   {posterFreeShipping
-                    ? 'Free Shipping ($20 value)'
+                    ? <>Free Shipping ({formatDollars(20)} value)</>
                     : `Free shipping over $${FREE_SHIPPING_THRESHOLD}`
                   } — 7-9 days
                 </span>
@@ -335,7 +337,7 @@ export default function FormatPage() {
                 <Truck className="h-4 w-4" />
                 <span>
                   {canvasFreeShipping
-                    ? 'Free Shipping ($20 value)'
+                    ? <>Free Shipping ({formatDollars(20)} value)</>
                     : `Free shipping over $${FREE_SHIPPING_THRESHOLD}`
                   } — 7-9 days
                 </span>

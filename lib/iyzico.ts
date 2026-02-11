@@ -1,35 +1,16 @@
 import 'server-only'
-import crypto from 'crypto'
 
-const API_KEY = process.env.IYZICO_API_KEY!
-const SECRET_KEY = process.env.IYZICO_SECRET_KEY!
-const BASE_URL = process.env.IYZICO_BASE_URL || 'https://sandbox-api.iyzipay.com'
+// Use the official iyzipay SDK for correct auth signature generation
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const Iyzipay = require('iyzipay')
 
-function generateAuthorizationHeader(uri: string, body: string): string {
-  const randomString = crypto.randomBytes(8).toString('hex')
-  const hashStr = API_KEY + randomString + SECRET_KEY + body
-  const hash = crypto.createHash('sha1').update(hashStr).digest('base64')
-  const authorizationParams = `apiKey:${API_KEY}&randomKey:${randomString}&signature:${hash}`
-  return `IYZWS ${Buffer.from(authorizationParams).toString('base64')}`
-}
+const iyzipay = new Iyzipay({
+  apiKey: process.env.IYZICO_API_KEY!,
+  secretKey: process.env.IYZICO_SECRET_KEY!,
+  uri: process.env.IYZICO_BASE_URL || 'https://api.iyzipay.com',
+})
 
-async function iyzicoFetch(endpoint: string, body: Record<string, unknown>) {
-  const uri = endpoint
-  const bodyStr = JSON.stringify(body)
-  const authorization = generateAuthorizationHeader(uri, bodyStr)
-
-  const res = await fetch(`${BASE_URL}${endpoint}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: authorization,
-      'x-iyzi-rnd': crypto.randomBytes(8).toString('hex'),
-    },
-    body: bodyStr,
-  })
-
-  return res.json()
-}
+// ── Types ──
 
 export interface CreatePaymentParams {
   price: string
@@ -57,21 +38,23 @@ export interface CreatePaymentParams {
   }>
 }
 
-export async function createCheckoutForm(params: CreatePaymentParams): Promise<{
+// ── Checkout Form Initialize ──
+
+export function createCheckoutForm(params: CreatePaymentParams): Promise<{
   status: string
   token?: string
   checkoutFormContent?: string
   paymentPageUrl?: string
   errorMessage?: string
 }> {
-  const body = {
+  const request = {
     locale: 'en',
     conversationId: params.conversationId,
     price: params.price,
     paidPrice: params.paidPrice,
     currency: params.currency,
     basketId: params.basketId,
-    paymentGroup: 'PRODUCT',
+    paymentGroup: Iyzipay.PAYMENT_GROUP.PRODUCT,
     callbackUrl: params.callbackUrl,
     enabledInstallments: [1, 2, 3, 6, 9],
     buyer: {
@@ -102,23 +85,43 @@ export async function createCheckoutForm(params: CreatePaymentParams): Promise<{
       id: item.id,
       name: item.name,
       category1: item.category,
-      itemType: 'VIRTUAL',
+      itemType: Iyzipay.BASKET_ITEM_TYPE.VIRTUAL,
       price: item.price,
     })),
   }
 
-  return iyzicoFetch('/payment/iyzi-pos/checkoutform/initialize/auth/ecom', body)
+  return new Promise((resolve, reject) => {
+    iyzipay.checkoutFormInitialize.create(request, (err: Error | null, result: Record<string, unknown>) => {
+      if (err) {
+        console.error('[iyzico] SDK error:', err)
+        reject(err)
+      } else {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[iyzico] Response:', (result as { status: string }).status)
+        }
+        resolve(result as { status: string; token?: string; checkoutFormContent?: string; paymentPageUrl?: string; errorMessage?: string })
+      }
+    })
+  })
 }
 
-export async function retrieveCheckoutForm(token: string): Promise<{
+// ── Retrieve Checkout Form Result ──
+
+export function retrieveCheckoutForm(token: string): Promise<{
   status: string
   paymentStatus?: string
   paymentId?: string
   price?: number
   errorMessage?: string
 }> {
-  return iyzicoFetch('/payment/iyzi-pos/checkoutform/auth/ecom/detail', {
-    locale: 'en',
-    token,
+  return new Promise((resolve, reject) => {
+    iyzipay.checkoutForm.retrieve({ locale: 'en', token }, (err: Error | null, result: Record<string, unknown>) => {
+      if (err) {
+        console.error('[iyzico] Retrieve error:', err)
+        reject(err)
+      } else {
+        resolve(result as { status: string; paymentStatus?: string; paymentId?: string; price?: number; errorMessage?: string })
+      }
+    })
   })
 }

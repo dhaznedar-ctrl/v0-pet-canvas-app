@@ -3,10 +3,12 @@
 import Link from 'next/link'
 import { ArrowLeft, Check, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useCurrency } from '@/components/fable/currency-provider'
 import { TopBar } from '@/components/fable/top-bar'
 import { FaqSection } from '@/components/fable/faq-section'
 
 export default function PacksPage() {
+  const { formatDollars } = useCurrency()
   return (
     <div className="min-h-screen bg-background text-foreground">
       <TopBar activeTab="pets" onTabChange={() => {}} />
@@ -38,8 +40,8 @@ export default function PacksPage() {
             <div className="text-center mb-6 mt-2">
               <h2 className="font-serif text-2xl text-foreground mb-1">10 Credits Pack</h2>
               <div className="flex items-baseline justify-center gap-2">
-                <span className="text-4xl font-bold text-primary">$39</span>
-                <span className="text-muted-foreground text-sm">$3.90/generation</span>
+                <span className="text-4xl font-bold text-primary">{formatDollars(39)}</span>
+                <span className="text-muted-foreground text-sm">{formatDollars(3.9)}/generation</span>
               </div>
             </div>
 
@@ -51,7 +53,7 @@ export default function PacksPage() {
                 'All art styles included',
                 'Retry & Describe Edit tools',
                 'Watermarked previews included',
-                'Purchase portraits individually ($29 each)',
+                `Purchase portraits individually (${formatDollars(29)} each)`,
               ].map((feature) => (
                 <div key={feature} className="flex items-start gap-2.5 text-sm">
                   <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
@@ -62,7 +64,7 @@ export default function PacksPage() {
 
             <Button className="w-full bg-primary hover:bg-primary/90 text-lg py-6">
               <Sparkles className="h-5 w-5 mr-2" />
-              Buy 10 Credits — $39
+              Buy 10 Credits — {formatDollars(39)}
             </Button>
           </div>
 
@@ -80,7 +82,7 @@ export default function PacksPage() {
                 <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <span className="text-primary text-xs font-bold">2</span>
                 </div>
-                <p className="text-sm text-muted-foreground">Preview results with a watermark. Love it? Purchase the HD version for $29.</p>
+                <p className="text-sm text-muted-foreground">Preview results with a watermark. Love it? Purchase the HD version for {formatDollars(29)}.</p>
               </div>
               <div className="flex gap-3">
                 <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">

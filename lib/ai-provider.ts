@@ -1,7 +1,7 @@
 import 'server-only'
 import sharp from 'sharp'
 import { buildGenerationRequest, STYLE_PROMPTS } from '@/lib/style-prompts'
-import { uploadToR2, existsInR2 } from '@/lib/r2'
+import { uploadToR2 } from '@/lib/r2'
 import { addWatermark } from '@/lib/watermark'
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024 // 2 MB target
@@ -296,11 +296,13 @@ async function downloadAndStore(imageUrl: string, jobId: number, style?: string)
   return { success: true, previewUrl, hdUrl }
 }
 
-const THUMBNAIL_SIZE = 128
+const THUMBNAIL_MAX_PX = 384
+const THUMBNAIL_TARGET_BYTES = 100 * 1024 // 100 KB max
 
 /**
- * Auto-generate a style thumbnail from a completed generation.
- * Only creates a thumbnail if one doesn't already exist in R2 for this style.
+ * Auto-generate a style thumbnail from every completed generation.
+ * Always overwrites the previous thumbnail so the gallery stays fresh.
+ * Compresses to ~70-100 KB target size.
  * Non-fatal: errors are logged but never propagated.
  */
 export async function autoSaveStyleThumbnail(
@@ -309,21 +311,27 @@ export async function autoSaveStyleThumbnail(
   jobId: number
 ): Promise<void> {
   try {
-    const config = STYLE_PROMPTS[style as keyof typeof STYLE_PROMPTS]
-    // Skip if the style already has a static thumbnail configured
-    if (config?.thumbnail) return
-
     const thumbKey = `thumbnails/${style}.jpg`
-    // Skip if a thumbnail already exists in R2
-    if (await existsInR2(thumbKey)) return
 
-    const thumbBuffer = await sharp(imageBuffer)
-      .resize(THUMBNAIL_SIZE, THUMBNAIL_SIZE, { fit: 'cover' })
-      .jpeg({ quality: 80 })
+    // Resize to 384px square cover crop, then compress to target
+    let thumbBuffer = await sharp(imageBuffer)
+      .resize(THUMBNAIL_MAX_PX, THUMBNAIL_MAX_PX, { fit: 'cover' })
+      .jpeg({ quality: 85, mozjpeg: true })
       .toBuffer()
 
+    // If still over target, reduce quality progressively
+    if (thumbBuffer.length > THUMBNAIL_TARGET_BYTES) {
+      for (const quality of [75, 65, 55]) {
+        thumbBuffer = await sharp(imageBuffer)
+          .resize(THUMBNAIL_MAX_PX, THUMBNAIL_MAX_PX, { fit: 'cover' })
+          .jpeg({ quality, mozjpeg: true })
+          .toBuffer()
+        if (thumbBuffer.length <= THUMBNAIL_TARGET_BYTES) break
+      }
+    }
+
     await uploadToR2(thumbKey, thumbBuffer, 'image/jpeg')
-    console.log(`[Job ${jobId}] Auto-saved style thumbnail for "${style}"`)
+    console.log(`[Job ${jobId}] Auto-saved style thumbnail for "${style}" (${(thumbBuffer.length / 1024).toFixed(0)} KB)`)
   } catch (err) {
     console.warn(`[Job ${jobId}] Failed to auto-save thumbnail:`, err)
   }

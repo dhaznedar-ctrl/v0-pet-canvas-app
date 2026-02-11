@@ -1,7 +1,9 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { AlertCircle, RefreshCw, ArrowLeft, Mail, Clock, Sparkles, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useCurrency } from '@/components/fable/currency-provider'
 
 // Error types matching the app state machine
 type ErrorType = 'upload_failed' | 'generate_failed' | 'payment_failed' | 'rate_limited'
@@ -14,6 +16,7 @@ interface ErrorStateProps {
   onContactSupport?: () => void
   onBuyCredits?: () => void
   onBuySinglePortrait?: () => void
+  resetTime?: number
 }
 
 const ERROR_CONTENT = {
@@ -55,9 +58,37 @@ export function ErrorState({
   onContactSupport,
   onBuyCredits,
   onBuySinglePortrait,
+  resetTime,
 }: ErrorStateProps) {
+  const { formatDollars } = useCurrency()
   const content = ERROR_CONTENT[errorType]
   const Icon = content.icon
+
+  // Countdown state for rate limit reset
+  const [countdown, setCountdown] = useState('')
+
+  useEffect(() => {
+    if (errorType !== 'rate_limited' || !resetTime) return
+
+    function updateCountdown() {
+      const diff = Math.max(0, resetTime! - Date.now())
+      if (diff <= 0) {
+        setCountdown('now')
+        return
+      }
+      const hours = Math.floor(diff / 3600000)
+      const minutes = Math.ceil((diff % 3600000) / 60000)
+      if (hours > 0) {
+        setCountdown(`${hours}h ${minutes}m`)
+      } else {
+        setCountdown(`${minutes}m`)
+      }
+    }
+
+    updateCountdown()
+    const interval = setInterval(updateCountdown, 30000) // update every 30s
+    return () => clearInterval(interval)
+  }, [errorType, resetTime])
 
   // Special rate_limited UI with credit purchase option
   if (errorType === 'rate_limited') {
@@ -82,9 +113,9 @@ export function ErrorState({
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h4 className="font-semibold text-foreground">10 Credits Pack</h4>
-                <p className="text-xs text-muted-foreground">$3.90 per generation</p>
+                <p className="text-xs text-muted-foreground">{formatDollars(3.9)} per generation</p>
               </div>
-              <span className="text-2xl font-bold text-primary">$39</span>
+              <span className="text-2xl font-bold text-primary">{formatDollars(39)}</span>
             </div>
 
             <div className="space-y-1.5 mb-4">
@@ -107,7 +138,7 @@ export function ErrorState({
               className="w-full bg-primary hover:bg-primary/90"
             >
               <Sparkles className="h-4 w-4 mr-2" />
-              Buy 10 Credits — $39
+              Buy 10 Credits — {formatDollars(39)}
             </Button>
           </div>
 
@@ -125,19 +156,29 @@ export function ErrorState({
                   onClick={onBuySinglePortrait}
                   className="bg-transparent text-xs"
                 >
-                  Buy for $29
+                  Buy for {formatDollars(29)}
                 </Button>
               </div>
             </div>
           )}
 
-          {/* Try again tomorrow */}
-          <button
-            onClick={onGoBack}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            or come back tomorrow for 5 more free previews
-          </button>
+          {/* Come back later with countdown */}
+          <div className="rounded-xl border border-border bg-card p-4 text-center">
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-foreground">
+                {countdown && countdown !== 'now'
+                  ? `Free previews reset in ${countdown}`
+                  : 'Free previews available now!'}
+              </span>
+            </div>
+            <button
+              onClick={onGoBack}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {countdown === 'now' ? 'Go back and try again' : 'Come back later for 5 more free previews'}
+            </button>
+          </div>
         </div>
       </div>
     )
@@ -189,14 +230,14 @@ export function ErrorState({
             </Button>
           )}
 
-          {errorType !== 'payment_failed' && onGoBack && (
+          {onGoBack && (
             <Button
               variant="outline"
               onClick={onGoBack}
               className="w-full bg-transparent"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
-              {content.secondaryAction}
+              {errorType === 'payment_failed' ? 'Back to Preview' : content.secondaryAction}
             </Button>
           )}
         </div>

@@ -16,6 +16,7 @@ if (process.env.NODE_ENV === 'development') {
 const CSRF_EXEMPT_PATHS = [
   '/api/iyzico/callback',
   '/api/cleanup',
+  '/api/printful/webhook',
 ]
 
 export function middleware(request: NextRequest) {

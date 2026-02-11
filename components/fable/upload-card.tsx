@@ -11,6 +11,7 @@ import type { TabType } from './top-bar'
 import { RetryOptionsModal } from './retry-options-modal'
 import { ConsentCheckbox, CONSENT_CONTENT } from './consent-checkbox'
 import { ProtectedImage } from './protected-image'
+import { useCurrency } from '@/components/fable/currency-provider'
 
 // Photo type from parent
 interface UploadedPhoto {
@@ -18,6 +19,13 @@ interface UploadedPhoto {
   file: File
   uploadId?: number
   fileUrl?: string
+}
+
+export interface Variation {
+  jobId: number
+  outputUrl: string
+  style: string
+  createdAt: string
 }
 
 interface UploadCardProps {
@@ -33,6 +41,7 @@ interface UploadCardProps {
   isGenerating?: boolean
   generatedImage?: string | null
   onRetry?: () => void
+  onUploadNew?: () => void
   onCustomEdit?: (description: string) => void
   onGenerationComplete?: (generatedImage: string) => void
   remainingCredits?: number
@@ -40,6 +49,10 @@ interface UploadCardProps {
   onUserEmailChange?: (email: string) => void
   petName?: string
   onPetNameChange?: (name: string) => void
+  variations?: Variation[]
+  onSelectVariation?: (variation: Variation) => void
+  selectedStyle?: string | null
+  onStyleChange?: (styleId: string) => void
 }
 
 // Consent state interface
@@ -118,13 +131,24 @@ const PHOTO_TIPS = [
 
 const GENERATION_MESSAGES = [
   'Analyzing your photo...',
-  'Applying the Pet Canvas Art style...',
+  'Understanding composition and features...',
+  'Selecting artistic palette...',
   'Painting initial layers...',
   'Building depth and texture...',
-  'Refining brushwork...',
-  'Adding fine details...',
-  'Perfecting the masterpiece...',
-  'Final touches...',
+  'Blending colors and tones...',
+  'Refining brushwork details...',
+  'Adding fine highlights...',
+  'Perfecting light and shadow...',
+  'Applying finishing touches...',
+  'Reviewing final quality...',
+  'Almost done — polishing your masterpiece...',
+]
+
+const OVERTIME_MESSAGES = [
+  'Taking a little extra care with the details...',
+  'Great art takes time — almost there...',
+  'Adding the final brushstrokes...',
+  'Your masterpiece is worth the wait...',
 ]
 
 // Accepted file types
@@ -147,6 +171,7 @@ export function UploadCard({
   isGenerating = false,
   generatedImage = null,
   onRetry,
+  onUploadNew,
   onCustomEdit,
   onGenerationComplete,
   remainingCredits = 5,
@@ -154,7 +179,12 @@ export function UploadCard({
   onUserEmailChange,
   petName = '',
   onPetNameChange,
+  variations = [],
+  onSelectVariation,
+  selectedStyle,
+  onStyleChange,
 }: UploadCardProps) {
+  const { formatDollars } = useCurrency()
   const [progress, setProgress] = useState(0)
   const [messageIndex, setMessageIndex] = useState(0)
   const [remainingSeconds, setRemainingSeconds] = useState(60)
@@ -208,7 +238,7 @@ export function UploadCard({
     return () => clearInterval(tipInterval)
   }, [photos.length, isGenerating, generatedImage])
 
-  // Generation progress animation - 60 seconds total
+  // Generation progress animation - asymptotic curve, never reaches 100% until done
   useEffect(() => {
     if (!isGenerating) {
       setProgress(0)
@@ -218,24 +248,43 @@ export function UploadCard({
     }
 
     const startTime = Date.now()
-    const totalDuration = 60000
+    const baseDuration = 60000 // 60s expected duration
 
     const progressInterval = setInterval(() => {
       const elapsed = Date.now() - startTime
-      const newProgress = Math.min((elapsed / totalDuration) * 100, 100)
+      const t = elapsed / baseDuration
+
+      // Asymptotic ease-out: fast start, slow approach to 95%
+      // Never exceeds 95% — final jump to 100% happens on completion
+      let newProgress: number
+      if (t <= 1) {
+        // 0-60s: smooth ease-out curve reaching ~92%
+        newProgress = (1 - Math.pow(1 - t, 2.5)) * 92
+      } else {
+        // >60s: slowly crawl from 92% toward 95%, never exceed
+        const overtime = t - 1
+        newProgress = 92 + Math.min(3, overtime * 2)
+      }
       setProgress(newProgress)
 
-      const remaining = Math.max(0, Math.ceil((totalDuration - elapsed) / 1000))
+      // Show time estimate only in first 50s, then switch to encouraging text
+      const remaining = Math.max(0, Math.ceil((baseDuration - elapsed) / 1000))
       setRemainingSeconds(remaining)
-
-      if (elapsed >= totalDuration) {
-        clearInterval(progressInterval)
-      }
     }, 100)
 
+    // Message progression: advance through messages based on time, don't cycle
     const messageInterval = setInterval(() => {
-      setMessageIndex((prev) => (prev + 1) % GENERATION_MESSAGES.length)
-    }, 3500)
+      setMessageIndex((prev) => {
+        const elapsed = Date.now() - startTime
+        if (elapsed > baseDuration) {
+          // After 60s, cycle through overtime messages
+          const overtimeIdx = Math.floor((elapsed - baseDuration) / 5000) % OVERTIME_MESSAGES.length
+          return GENERATION_MESSAGES.length + overtimeIdx
+        }
+        // During normal time, advance linearly (don't cycle back)
+        return Math.min(prev + 1, GENERATION_MESSAGES.length - 1)
+      })
+    }, 4500)
 
     return () => {
       clearInterval(progressInterval)
@@ -315,14 +364,16 @@ export function UploadCard({
           {/* Left — Preview Image */}
           <div className="relative">
             <div className="relative rounded-xl overflow-hidden bg-card border border-border">
-              {/* Edit Button */}
-              <button
-                onClick={() => setRetryModalOpen(true)}
-                className="absolute top-2 right-2 sm:top-3 sm:right-3 z-30 flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 bg-foreground/80 backdrop-blur-sm rounded-full text-xs sm:text-sm text-background hover:bg-foreground transition-all"
-              >
-                <Pencil className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                <span>Edit ({remainingCredits} left)</span>
-              </button>
+              {/* Edit Button — hidden during regeneration */}
+              {!isGenerating && (
+                <button
+                  onClick={() => setRetryModalOpen(true)}
+                  className="absolute top-2 right-2 sm:top-3 sm:right-3 z-30 flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 bg-foreground/80 backdrop-blur-sm rounded-full text-xs sm:text-sm text-background hover:bg-foreground transition-all"
+                >
+                  <Pencil className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                  <span>Edit ({remainingCredits} left)</span>
+                </button>
+              )}
 
               {/* Generated Image — canvas-based to prevent right-click save */}
               <div className="relative aspect-[4/5] select-none">
@@ -357,8 +408,73 @@ export function UploadCard({
                     ))}
                   </div>
                 </div>
+
+                {/* Regeneration Overlay — shows on top of existing image */}
+                {isGenerating && (() => {
+                  const regenMsg = messageIndex >= GENERATION_MESSAGES.length
+                    ? OVERTIME_MESSAGES[messageIndex - GENERATION_MESSAGES.length] || OVERTIME_MESSAGES[0]
+                    : GENERATION_MESSAGES[messageIndex]
+                  return (
+                    <div className="absolute inset-0 z-30 bg-background/70 backdrop-blur-sm flex flex-col items-center justify-center">
+                      <div className="relative w-14 h-14 mb-3">
+                        <div className="absolute inset-0 rounded-full bg-primary/10 animate-ping" style={{ animationDuration: '2s' }} />
+                        <div className="relative w-full h-full rounded-full bg-primary/5 border border-primary/20 flex items-center justify-center">
+                          <Sparkles className="h-6 w-6 text-primary animate-pulse" />
+                        </div>
+                      </div>
+                      <p className="font-serif text-base sm:text-lg italic text-foreground mb-1">Regenerating...</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground mb-3 text-center px-4">{regenMsg}</p>
+                      <div className="w-32 h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-primary/80 via-primary to-primary/80 rounded-full transition-all duration-300"
+                          style={{ width: `${Math.round(progress)}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1.5">{Math.round(progress)}%</p>
+                    </div>
+                  )
+                })()}
               </div>
             </div>
+
+            {/* Variation Thumbnail Strip */}
+            {variations.length > 1 && (
+              <div className="mt-3">
+                <div className="flex justify-center">
+                  <div className="flex gap-2 sm:gap-2.5 overflow-x-auto max-w-full pb-1 px-1">
+                    {variations.map((variation, idx) => {
+                      const isActive = variation.outputUrl === generatedImage
+                      return (
+                        <button
+                          key={variation.jobId}
+                          onClick={() => onSelectVariation?.(variation)}
+                          className={`relative flex-shrink-0 w-12 h-[60px] sm:w-14 sm:h-[70px] rounded-lg overflow-hidden transition-all duration-200 ${
+                            isActive
+                              ? 'ring-2 ring-primary scale-105'
+                              : 'ring-1 ring-border opacity-60 hover:opacity-100'
+                          }`}
+                        >
+                          <ProtectedImage
+                            src={variation.outputUrl}
+                            alt={`Variation ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                            aspectRatio="4/5"
+                          />
+                          {isActive && (
+                            <div className="absolute top-0.5 right-0.5 bg-primary rounded-full p-0.5">
+                              <Check className="h-2 w-2 text-primary-foreground" />
+                            </div>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground text-center mt-1.5">
+                  {variations.findIndex(v => v.outputUrl === generatedImage) + 1} of {variations.length} variations
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Right — Info Panel */}
@@ -403,7 +519,7 @@ export function UploadCard({
             </button>
 
             <p className="text-xs sm:text-sm text-muted-foreground text-center">
-              Starting from <span className="font-semibold text-foreground">$29</span>
+              Starting from <span className="font-semibold text-foreground">{formatDollars(29)}</span>
             </p>
           </div>
         </div>
@@ -415,11 +531,15 @@ export function UploadCard({
             if (onRetry) onRetry()
           }}
           onUploadNew={() => {
-            if (onRetry) onRetry()
+            if (onUploadNew) onUploadNew()
           }}
           onCustomEdit={(description) => {
             if (onCustomEdit) onCustomEdit(description)
           }}
+          remainingActions={remainingCredits}
+          activeTab={activeTab}
+          selectedStyle={selectedStyle}
+          onStyleChange={onStyleChange}
         />
       </>
     )
@@ -441,26 +561,59 @@ export function UploadCard({
       ? `We are creating ${displayName}'s ${label}...`
       : `We are creating your ${label}...`
 
+    const currentMessage = messageIndex >= GENERATION_MESSAGES.length
+      ? OVERTIME_MESSAGES[messageIndex - GENERATION_MESSAGES.length] || OVERTIME_MESSAGES[0]
+      : GENERATION_MESSAGES[messageIndex]
+
+    const isOvertime = remainingSeconds <= 0
+
     return (
       <div className="relative w-full max-w-4xl mx-auto">
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="flex flex-col items-center justify-center py-12 sm:py-16 px-4 sm:px-8">
+            {/* Pulsing painting icon */}
+            <div className="relative w-16 h-16 sm:w-20 sm:h-20 mb-4">
+              <div className="absolute inset-0 rounded-full bg-primary/10 animate-ping" style={{ animationDuration: '2s' }} />
+              <div className="relative w-full h-full rounded-full bg-primary/5 border border-primary/20 flex items-center justify-center">
+                <Sparkles className="h-7 w-7 sm:h-9 sm:w-9 text-primary animate-pulse" />
+              </div>
+            </div>
+
             <p className="font-serif text-xl sm:text-2xl italic text-foreground mb-2 text-center">
               {personalMessage}
             </p>
-            <p className="text-muted-foreground text-sm sm:text-base mb-6 sm:mb-8 text-center">
-              {GENERATION_MESSAGES[messageIndex]}
+            <p className="text-muted-foreground text-sm sm:text-base mb-6 sm:mb-8 text-center min-h-[24px] transition-opacity duration-500">
+              {currentMessage}
             </p>
 
-            <div className="w-full max-w-xs h-1.5 bg-muted rounded-full overflow-hidden mb-4">
-              <div
-                className="h-full bg-foreground transition-all duration-100 ease-linear rounded-full"
-                style={{ width: `${progress}%` }}
-              />
+            {/* Progress bar with glow effect */}
+            <div className="w-full max-w-xs mb-4">
+              <div className="h-2 bg-muted rounded-full overflow-hidden relative">
+                <div
+                  className="h-full bg-gradient-to-r from-primary/80 via-primary to-primary/80 rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${Math.round(progress)}%` }}
+                />
+                {/* Shimmer effect on the bar */}
+                <div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent rounded-full animate-shimmer"
+                  style={{ animationDuration: '2s', animationIterationCount: 'infinite' }}
+                />
+              </div>
             </div>
 
-            <p className="text-muted-foreground text-sm mb-1">{Math.round(progress)}%</p>
-            <p className="text-muted-foreground/70 text-sm">~{remainingSeconds} seconds remaining</p>
+            <p className="text-foreground font-medium text-sm mb-1">{Math.round(progress)}%</p>
+
+            {isOvertime ? (
+              <p className="text-primary/80 text-sm animate-pulse">Just a moment longer...</p>
+            ) : (
+              <p className="text-muted-foreground/70 text-sm">Usually takes about a minute</p>
+            )}
+
+            {/* Stay on page notice */}
+            <div className="mt-6 flex items-center gap-1.5 text-muted-foreground/50">
+              <Lock className="h-3 w-3" />
+              <p className="text-[10px] sm:text-xs">Please keep this page open</p>
+            </div>
           </div>
         </div>
       </div>
@@ -687,6 +840,7 @@ export function UploadCard({
           <div className="relative flex flex-col items-center justify-center py-6 sm:py-10 px-4 sm:px-8">
             {/* Pick Style — top right */}
             <button
+              id="pick-style-btn"
               onClick={(e) => {
                 e.stopPropagation()
                 onOpenStylePicker()

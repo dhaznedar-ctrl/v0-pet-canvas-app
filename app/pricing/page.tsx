@@ -3,8 +3,9 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { PawPrint, Users, Baby, Heart, User } from 'lucide-react'
+import { useCurrency } from '@/components/fable/currency-provider'
 import { Button } from '@/components/ui/button'
-import { TopBar } from '@/components/fable/top-bar'
+import { TopBar, type TabType } from '@/components/fable/top-bar'
 import { FaqSection } from '@/components/fable/faq-section'
 
 const PRINT_SIZES = [
@@ -22,7 +23,8 @@ const CANVAS_SIZES = [
 ]
 
 export default function PricingPage() {
-  const [activeTab, setActiveTab] = useState<'pets' | 'family' | 'kids'>('pets')
+  const [activeTab, setActiveTab] = useState<TabType>('pets')
+  const { formatDollars } = useCurrency()
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -53,8 +55,8 @@ export default function PricingPage() {
                 <PawPrint className="h-4 w-4 text-primary" />
                 <span className="font-semibold text-foreground text-sm">Pet Portrait</span>
               </div>
-              <p className="text-muted-foreground text-xs mb-3">Single pet photo</p>
-              <p className="text-3xl font-bold text-primary mb-3">$29</p>
+              <p className="text-muted-foreground text-xs mb-3">Single or multiple pets (all kinds)</p>
+              <p className="text-3xl font-bold text-primary mb-3">{formatDollars(29)}</p>
               <Link href="/?tab=pets">
                 <Button size="sm" className="w-full bg-primary hover:bg-primary/90 text-xs">
                   Create Now
@@ -74,7 +76,7 @@ export default function PricingPage() {
                 <span className="font-semibold text-foreground text-sm">Family</span>
               </div>
               <p className="text-muted-foreground text-xs mb-3">Multiple people & pets</p>
-              <p className="text-3xl font-bold text-primary mb-3">$29</p>
+              <p className="text-3xl font-bold text-primary mb-3">{formatDollars(29)}</p>
               <Link href="/?tab=family">
                 <Button size="sm" className="w-full bg-primary hover:bg-primary/90 text-xs">
                   Create Now
@@ -94,7 +96,7 @@ export default function PricingPage() {
                 <span className="font-semibold text-foreground text-sm">Kids</span>
               </div>
               <p className="text-muted-foreground text-xs mb-3">Children & siblings</p>
-              <p className="text-3xl font-bold text-primary mb-3">$29</p>
+              <p className="text-3xl font-bold text-primary mb-3">{formatDollars(29)}</p>
               <Link href="/?tab=kids">
                 <Button size="sm" className="w-full bg-primary hover:bg-primary/90 text-xs">
                   Create Now
@@ -109,7 +111,7 @@ export default function PricingPage() {
                 <span className="font-semibold text-foreground text-sm">Couples</span>
               </div>
               <p className="text-muted-foreground text-xs mb-3">Romantic portraits</p>
-              <p className="text-3xl font-bold text-primary mb-3">$29</p>
+              <p className="text-3xl font-bold text-primary mb-3">{formatDollars(29)}</p>
               <Link href="/?tab=couples">
                 <Button size="sm" className="w-full bg-primary hover:bg-primary/90 text-xs">
                   Create Now
@@ -124,7 +126,7 @@ export default function PricingPage() {
                 <span className="font-semibold text-foreground text-sm">Self-Portrait</span>
               </div>
               <p className="text-muted-foreground text-xs mb-3">Your own masterpiece</p>
-              <p className="text-3xl font-bold text-primary mb-3">$29</p>
+              <p className="text-3xl font-bold text-primary mb-3">{formatDollars(29)}</p>
               <Link href="/?tab=self">
                 <Button size="sm" className="w-full bg-primary hover:bg-primary/90 text-xs">
                   Create Now
@@ -157,13 +159,13 @@ export default function PricingPage() {
             {PRINT_SIZES.map((item) => (
               <div key={item.size} className="rounded-2xl border border-border bg-card p-6 text-center">
                 <p className="text-foreground font-medium mb-2">{item.size}</p>
-                <p className="text-2xl font-bold text-primary">${item.price}</p>
+                <p className="text-2xl font-bold text-primary">{formatDollars(item.price)}</p>
               </div>
             ))}
           </div>
 
           <p className="text-muted-foreground text-sm text-center mt-6">
-            Free worldwide shipping · Printed in the EU
+            Includes digital download · Premium archival paper
           </p>
         </section>
 
@@ -181,13 +183,13 @@ export default function PricingPage() {
             {CANVAS_SIZES.map((item) => (
               <div key={item.size} className="rounded-2xl border border-border bg-card p-6 text-center">
                 <p className="text-foreground font-medium mb-2">{item.size}</p>
-                <p className="text-2xl font-bold text-primary">${item.price}</p>
+                <p className="text-2xl font-bold text-primary">{formatDollars(item.price)}</p>
               </div>
             ))}
           </div>
 
           <p className="text-muted-foreground text-sm text-center mt-6">
-            Free worldwide shipping · Printed in the EU
+            Gallery-wrapped · Ready to hang · Premium archival canvas
           </p>
         </section>
 

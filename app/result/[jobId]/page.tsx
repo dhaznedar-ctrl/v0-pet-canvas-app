@@ -1,16 +1,24 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { TopBar, type TabType } from '@/components/fable/top-bar'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, Loader2 } from 'lucide-react'
+import { RefreshCw, Loader2, Check } from 'lucide-react'
 import { ProtectedImage } from '@/components/fable/protected-image'
+
+interface Variation {
+  jobId: number
+  outputUrl: string
+  style: string
+  createdAt: string
+}
 
 interface JobResult {
   status: 'queued' | 'processing' | 'completed' | 'failed'
   outputUrl?: string
   error?: string
+  variations?: Variation[]
 }
 
 export default function ResultPage() {
@@ -21,6 +29,8 @@ export default function ResultPage() {
   const [activeTab, setActiveTab] = useState<TabType>('pets')
   const [job, setJob] = useState<JobResult | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [selectedVariation, setSelectedVariation] = useState<Variation | null>(null)
+  const [isFading, setIsFading] = useState(false)
 
   useEffect(() => {
     const fetchJob = async () => {
@@ -36,6 +46,11 @@ export default function ResultPage() {
           setIsLoading(false)
           if (data.status === 'completed' && data.outputUrl) {
             sessionStorage.setItem('fable_result', data.outputUrl)
+            // Set initial selected variation to the current job
+            if (data.variations) {
+              const current = data.variations.find((v: Variation) => v.jobId === Number(jobId))
+              if (current) setSelectedVariation(current)
+            }
           }
         }
       } catch (error) {
@@ -47,12 +62,25 @@ export default function ResultPage() {
     fetchJob()
   }, [jobId])
 
+  const handleSelectVariation = useCallback((variation: Variation) => {
+    if (selectedVariation?.jobId === variation.jobId) return
+    setIsFading(true)
+    setTimeout(() => {
+      setSelectedVariation(variation)
+      sessionStorage.setItem('fable_result', variation.outputUrl)
+      setIsFading(false)
+    }, 150)
+  }, [selectedVariation])
+
   const handleRetry = () => {
     router.push('/create')
   }
 
+  const selectedJobId = selectedVariation ? String(selectedVariation.jobId) : jobId
+  const displayUrl = selectedVariation?.outputUrl ?? job?.outputUrl
+
   const handleContinueToFormat = () => {
-    router.push(`/format?jobId=${jobId}`)
+    router.push(`/format?jobId=${selectedJobId}`)
   }
 
   return (
@@ -85,16 +113,21 @@ export default function ResultPage() {
                   {job?.status === 'queued' ? 'Waiting in queue...' : 'Generating your portrait...'}
                 </p>
               </div>
-            ) : job?.status === 'completed' && job.outputUrl ? (
+            ) : job?.status === 'completed' && displayUrl ? (
               <div className="relative w-full max-w-2xl select-none">
                 <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/40">
                   {/* Canvas-based image rendering to prevent right-click save */}
-                  <ProtectedImage
-                    src={job.outputUrl}
-                    alt="Your masterpiece"
-                    className="w-full"
-                    aspectRatio="3/4"
-                  />
+                  <div
+                    className="transition-opacity duration-300 ease-in-out"
+                    style={{ opacity: isFading ? 0 : 1 }}
+                  >
+                    <ProtectedImage
+                      src={displayUrl}
+                      alt="Your masterpiece"
+                      className="w-full"
+                      aspectRatio="3/4"
+                    />
+                  </div>
                   {/* CSS watermark overlay */}
                   <div className="absolute inset-0 z-20 pointer-events-none overflow-hidden">
                     <div
@@ -133,6 +166,47 @@ export default function ResultPage() {
                 <p className="text-xs sm:text-sm text-muted-foreground text-center mt-3">
                   This is a watermarked preview. Purchase to download the full-resolution version.
                 </p>
+
+                {/* Variation Thumbnail Strip */}
+                {job.variations && job.variations.length > 1 && (
+                  <div className="mt-6">
+                    <p className="text-xs sm:text-sm text-muted-foreground text-center mb-3">
+                      {selectedVariation
+                        ? `${job.variations.findIndex(v => v.jobId === selectedVariation.jobId) + 1} of ${job.variations.length} Variations`
+                        : `${job.variations.length} Variations`}
+                    </p>
+                    <div className="flex justify-center">
+                      <div className="flex gap-2 sm:gap-3 overflow-x-auto max-w-full pb-2 px-1">
+                        {job.variations.map((variation) => {
+                          const isActive = selectedVariation?.jobId === variation.jobId
+                          return (
+                            <button
+                              key={variation.jobId}
+                              onClick={() => handleSelectVariation(variation)}
+                              className={`relative flex-shrink-0 w-14 h-[70px] sm:w-16 sm:h-20 rounded-lg overflow-hidden transition-all duration-200 ${
+                                isActive
+                                  ? 'ring-2 ring-primary scale-105'
+                                  : 'ring-1 ring-border opacity-70 hover:opacity-100'
+                              }`}
+                            >
+                              <ProtectedImage
+                                src={variation.outputUrl}
+                                alt={variation.style}
+                                className="w-full h-full object-cover"
+                                aspectRatio="3/4"
+                              />
+                              {isActive && (
+                                <div className="absolute top-0.5 right-0.5 bg-primary rounded-full p-0.5">
+                                  <Check className="h-2.5 w-2.5 text-primary-foreground" />
+                                </div>
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="w-full max-w-2xl aspect-[3/4] rounded-2xl bg-card/50 border border-border flex flex-col items-center justify-center p-8">

@@ -99,6 +99,33 @@ export const STYLE_PROMPTS: Record<string, ThemeConfig> = {
     settings: DEFAULT_SETTINGS,
   },
 
+  'royal-azure': {
+    name: 'Royal Azure',
+    description: 'Deep royal-blue velvet cape with gold embroidery and warm palace atmosphere',
+    model: MODEL,
+    prompt: `Transform the subject from the reference photo into an ultra-detailed authentic Old Master oil painting. The subject must dominate the composition as the primary focal point, positioned dead center and filling at least 70% of the frame — large, prominent, and commanding attention.
+
+Preserve the subject's exact natural colors, face, eyes, expression, fur texture, and all distinguishing physical features with photographic precision — do not yellow, warm-tint, or alter the subject's natural coloring in any way.
+
+CRITICAL POSE RULE: The subject's face and body MUST face the SAME direction as in the reference photo. Copy the exact pose orientation directly — do NOT mirror or horizontally flip the subject. If the subject's nose points to the left side of the reference photo, the nose must point to the left side of the generated image. If the subject's nose points to the right, it must point to the right. Treat the reference photo as a direct template for pose direction — replicate it exactly as-is, never reversed.
+
+Remove any modern accessories such as collars, leashes, harnesses, bows, or tags.
+
+The subject sits regally on an elegant cushion upholstered in muted cream-beige damask fabric with subtle floral scroll patterns and a small gold tassel. Drape a flowing deep royal-blue velvet cape over the subject — the cape should be long and luxurious, cascading down and pooling onto the cushion and beyond. The cape has rich gold embroidered borders with scrolling floral motifs along the edges, and a narrow ermine fur collar with small black spots at the neckline. Add a thick ornate gold chain collar around the neck as a statement piece — chunky linked gold with a decorative clasp, no pendant.
+
+Background: warm, dark interior suggesting a grand palace room — soft impression of dark wood paneling and the faint edge of an ornate gilt picture frame, all painted loosely and slightly out of focus. No sharp architectural details, no legible paintings, no distinct objects — just warm amber-brown tones with subtle gold accents dissolving into painterly shadow. The background should feel like a palace but remain subordinate to the subject.
+
+Lighting is warm golden chiaroscuro from the upper left, casting rich highlights on the blue velvet and gold embroidery while deep warm shadows fill the background.
+
+Render as an ultra-realistic oil painting with extreme attention to detail: every individual hair and fur strand rendered with natural sheen and direction, the rich sheen of royal-blue velvet fabric, intricate gold embroidery threadwork, each tiny ermine spot, chunky gold chain links catching light, subtle damask weave pattern on the cushion. The painting should be so detailed it could be mistaken for a photograph of an actual 17th century oil painting hanging in a museum.
+
+Paint with visible impasto brushstrokes throughout, authentic craquelure aging cracks across the entire surface, rich layered oil glazing creating depth and luminosity, and warm sfumato transitions between light and shadow. Museum-quality masterpiece, majestic, regal, timeless.`,
+    colors: ['#1B3A6B', '#C9A84C', '#F5F0E1', '#3E2723', '#2F2F2F'],
+    thumbnail: '/samples/royal-azure.jpg',
+    tabs: ['pets'],
+    settings: DEFAULT_SETTINGS,
+  },
+
   // ═══════════════════════════════════════
   // HUMAN / FAMILY THEMES
   // ═══════════════════════════════════════
@@ -183,7 +210,23 @@ export const STYLE_PROMPTS: Record<string, ThemeConfig> = {
     name: 'Royal Portrait',
     description: 'Classic royal pet portrait',
     model: MODEL,
-    prompt: `${PET_BASE} The subject sits regally on a luxurious velvet tufted cushion with intricate gold thread embroidery and golden tassels, resting on an ornate draped velvet cloth with elaborate gold brocade patterns cascading beneath. Drape a royal cape trimmed with ermine fur in a color that harmonizes with the subject's natural tones, and add a gold chain necklace with a pearl pendant. Dark background with a faint classical marble column on one side and subtle draped silk curtain on the other, warm Rembrandt chiaroscuro lighting from the upper left. ${PET_FINISH}`,
+    prompt: `Transform the subject from the reference photo into an ultra-detailed authentic Old Master oil painting. The subject must dominate the composition as the primary focal point, positioned dead center and filling at least 70% of the frame — large, prominent, and commanding attention.
+
+Preserve the subject's exact natural colors, face, eyes, expression, fur texture, and all distinguishing physical features with photographic precision — do not yellow, warm-tint, or alter the subject's natural coloring in any way.
+
+CRITICAL POSE RULE: The subject's face and body MUST face the SAME direction as in the reference photo. Copy the exact pose orientation directly — do NOT mirror or horizontally flip the subject. If the subject's nose points to the left side of the reference photo, the nose must point to the left side of the generated image. If the subject's nose points to the right, it must point to the right. Treat the reference photo as a direct template for pose direction — replicate it exactly as-is, never reversed.
+
+Remove any modern accessories such as collars, leashes, harnesses, bows, or tags.
+
+The subject sits regally on a luxurious velvet tufted cushion with intricate gold thread embroidery and golden tassels, resting on an ornate draped velvet cloth with elaborate gold brocade patterns cascading beneath. Drape a royal cape trimmed with ermine fur in a color that harmonizes with the subject's natural tones, and add a gold chain necklace with a pearl pendant.
+
+Background: deep, dark, painterly oil-paint texture — loose expressive brushstrokes in warm umber and dark olive tones blending into shadow. No columns, no curtains, no furniture, no architecture, no landscape — just rich, layered oil paint with visible brush marks and subtle tonal variation suggesting depth. The background should look like a master painter's canvas — thick paint, soft color transitions, and atmospheric darkness. All light and attention must remain on the subject.
+
+Lighting is warm Rembrandt chiaroscuro from the upper left, casting rich golden highlights on the subject and deep warm shadows on the opposite side.
+
+Render as an ultra-realistic oil painting with extreme attention to detail: every individual hair and fur strand rendered with natural sheen and direction, realistic fabric weave texture in the velvet cushion, each tiny black spot on the ermine fur individually painted, light reflections on gold chain links, translucent pearl luster, soft shadow gradients across fur and fabric. The painting should be so detailed it could be mistaken for a photograph of an actual 17th century oil painting hanging in a museum.
+
+Paint with visible impasto brushstrokes throughout, authentic craquelure aging cracks across the entire surface, rich layered oil glazing creating depth and luminosity, and warm sfumato transitions between light and shadow. Museum-quality masterpiece, majestic, dignified, timeless.`,
     colors: ['#DAA520', '#8B0000', '#2F2F2F', '#C9B896', '#4B0082'],
     tabs: [],
     settings: DEFAULT_SETTINGS,
@@ -201,8 +244,22 @@ export const STYLE_PROMPTS: Record<string, ThemeConfig> = {
     name: 'Kids Portrait',
     description: 'Classic children portrait',
     model: MODEL,
-    prompt: `${HUMAN_BASE} Maintain natural joyful expressions, genuine smiles, and warm childhood innocence. Dress all subjects in elegant Regency-era velvet clothing: girls in rich burgundy or crimson velvet empire-waist dresses with delicate white lace Peter Pan collars; boys in velvet suits — navy blue, forest green, or chocolate brown — with crisp white lace collars. Arrange subjects in an intimate, affectionate composition capturing the natural warmth between siblings. Paint soft rosy cheeks, luminous sparkling eyes, and warm glowing skin. Background is a romantic English landscape with dark ancient trees, golden sunset sky through foliage, and wildflowers. Warm golden Rembrandt lighting from the upper left. ${HUMAN_FINISH}`,
-    colors: ['#8B4513', '#DAA520', '#2F2F2F', '#C9B896', '#87CEEB'],
+    prompt: `Transform all subjects from the reference photo into an ultra-detailed authentic Old Master oil painting. Preserve every subject's face, eyes, expression, skin tone, hair color, and distinguishing features with absolute photographic accuracy — each person must be instantly recognizable. Maintain natural joyful expressions, genuine smiles, and warm childhood innocence.
+
+Dress all subjects in elegant Victorian-era velvet clothing: girls in rich velvet dresses in warm feminine tones — deep burgundy, soft rose pink, dusty mauve, or plum — with wide white lace collars, delicate lace cuffs, and satin ribbon sashes at the waist; boys in velvet suits in darker tones — navy blue, dark chocolate brown, or forest green — with crisp white collars and cuffs. Keep clothing simple and elegant — no elaborate embroidery, no jewelry, no hats.
+
+Arrange subjects in a close, intimate composition — siblings leaning into each other affectionately, hands gently resting on each other or on a pet if present. If a pet is in the reference photo, place it centrally between the children, with the children's arms lovingly around it. Subjects should fill at least 75% of the frame.
+
+Paint soft rosy cheeks with natural flush, luminous sparkling eyes with catchlights, and warm glowing skin with the porcelain quality of a Bouguereau painting.
+
+Background: soft, dark, completely out-of-focus — a smooth gradient from deep warm umber-brown to dark navy-blue tones with no discernible objects. No trees, no landscape, no flowers, no sky, no furniture — just a painterly dark atmospheric void that keeps all attention on the subjects. Subtle warm undertones only.
+
+Lighting is warm, soft Rembrandt-style from the upper left — gently modeling faces and creating a luminous glow on skin and velvet textures. Deep soft shadows on the opposite side.
+
+Render with extreme realistic detail: individual skin pores, fabric weave texture in the velvet, delicate lace threadwork, soft individual hair strands catching light. Paint with smooth refined brushwork in the style of William-Adolphe Bouguereau — luminous academic realism, porcelain skin, rich saturated fabrics. Subtle craquelure aging texture and warm sfumato transitions.
+
+Color palette: deep burgundy crimson, soft rose pink, dusty mauve, dark navy blue, warm umber brown, ivory white, natural rosy skin tones. Museum-quality masterpiece, tender, warm, and timeless.`,
+    colors: ['#8B0000', '#DEB0B0', '#C08081', '#191970', '#8B4513'],
     tabs: [],
     settings: DEFAULT_SETTINGS,
   },

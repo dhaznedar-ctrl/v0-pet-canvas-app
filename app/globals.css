@@ -156,3 +156,13 @@
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
+
+/* Shimmer animation for progress bar */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}

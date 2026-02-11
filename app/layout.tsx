@@ -2,6 +2,7 @@ import React from "react"
 import type { Metadata } from 'next'
 import { Inter, Playfair_Display } from 'next/font/google'
 import { Toaster } from '@/components/ui/toaster'
+import { CurrencyProvider } from '@/components/fable/currency-provider'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
@@ -21,7 +22,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} ${playfair.variable} font-sans antialiased min-h-screen bg-background text-foreground`}>
-        {children}
+        <CurrencyProvider>
+          {children}
+        </CurrencyProvider>
         <Toaster />
       </body>
     </html>

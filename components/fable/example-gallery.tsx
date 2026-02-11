@@ -7,22 +7,22 @@ interface ExampleGalleryProps {
   activeTab: TabType
 }
 
-// Customer example images
-const FAMILY_IMG_1 = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/family-fable-valentine.BzyjY4Xf-iTGpdXOL7xdqD3HTU7r8uMjycuHyVB.png'
-const FAMILY_IMG_2 = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/family-fable-1.DelWVwG0-AUB10YyXFOF3rctTFwuylhsNWk69t9.jpg'
-const FAMILY_IMG_3 = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/family-fable-2.nTPZjp-m-p8Esfgn9bSRvE3CxDsSBNWjSPSmV0n.jpg'
-const KIDS_IMG_1 = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/fable-kids-1.jpg-DWGbglBjg4pL8Xip7Ajk3C1PsUuOps.png'
-const KIDS_IMG_2 = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/fable-kids-2.jpg-M86Vd8b3qEY6FuARIq0UzS3ZyXfhq9.png'
-const KIDS_IMG_3 = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/fable-kids-3.jpg-QIHlhDt4nOaoGMvitJ1SNzf5im3JKl.png'
-
 const GALLERY_IMAGES: Record<TabType, string[]> = {
   pets: [
     '/images/1761061991787-fable-by-surrealium-example-1.jpg',
     '/images/1761061998281-fable-by-surrealium-example-2.jpg',
     '/samples/horse-masterpiece.jpg',
   ],
-  family: [FAMILY_IMG_1, FAMILY_IMG_2, FAMILY_IMG_3],
-  kids: [KIDS_IMG_1, KIDS_IMG_2, KIDS_IMG_3],
+  family: [
+    '/images/family/family-1.png',
+    '/images/family/family-2.jpg',
+    '/images/family/family-3.jpg',
+  ],
+  kids: [
+    '/images/kids/kids-1.png',
+    '/images/kids/kids-2.png',
+    '/images/kids/kids-3.png',
+  ],
   couples: [
     '/images/couples/couple-1.jpg',
     '/images/couples/couple-2.jpg',

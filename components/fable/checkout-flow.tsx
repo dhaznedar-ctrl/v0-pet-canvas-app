@@ -3,19 +3,23 @@
 import { useState, useEffect, useRef } from 'react'
 import { Loader2, CreditCard, CheckCircle, Package, Truck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useCurrency } from '@/components/fable/currency-provider'
 
 interface OrderDetails {
-  type: 'download' | 'small_print' | 'large_print'
+  type: 'download' | 'poster_print' | 'canvas_print'
   size?: string
+  frame?: string
   price: number
   email?: string
   productId?: string
   style?: string
+  jobId?: number
 }
 
 interface CheckoutFlowProps {
   order: OrderDetails
   authToken?: string | null
+  turnstileToken?: string | null
   onPaymentSuccess: () => void
   onPaymentFailed: (error: string) => void
   onBack: () => void
@@ -26,6 +30,7 @@ type CheckoutState = 'initializing' | 'form_ready' | 'processing' | 'success' | 
 export function CheckoutFlow({
   order,
   authToken,
+  turnstileToken,
   onPaymentSuccess,
   onPaymentFailed,
   onBack,
@@ -33,29 +38,47 @@ export function CheckoutFlow({
   const [state, setState] = useState<CheckoutState>('initializing')
   const [checkoutHtml, setCheckoutHtml] = useState<string | null>(null)
   const formContainerRef = useRef<HTMLDivElement>(null)
+  const initStartedRef = useRef(false)
+  const { formatDollars } = useCurrency()
 
   // Initialize iyzico checkout
   useEffect(() => {
     if (state !== 'initializing') return
+    if (initStartedRef.current) return
+    initStartedRef.current = true
 
     async function initCheckout() {
       try {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' }
         if (authToken) headers['Authorization'] = `Bearer ${authToken}`
 
+        if (!order.email) {
+          onPaymentFailed('Email is required. Please go back and try again.')
+          return
+        }
+
         const res = await fetch('/api/checkout/create', {
           method: 'POST',
           headers,
           body: JSON.stringify({
             email: order.email,
-            style: order.style || 'renaissance',
+            style: order.style || 'royal-portrait',
             productId: order.productId || 'pet-portrait-digital',
+            jobId: order.jobId || undefined,
+            turnstileToken: turnstileToken || undefined,
           }),
         })
 
         const data = await res.json()
 
+        if (res.status === 409 && data.orderId) {
+          // Already purchased — redirect to success
+          window.location.href = `/success?orderId=${data.orderId}`
+          return
+        }
+
         if (!res.ok) {
+          initStartedRef.current = false
           onPaymentFailed(data.error || 'Failed to initialize payment')
           return
         }
@@ -112,7 +135,7 @@ export function CheckoutFlow({
             Setting up your payment form.
           </p>
           <p className="text-xs text-muted-foreground">
-            {order.type === 'download' ? 'Digital download' : `${order.size} print`} — ${order.price}
+            {order.type === 'download' ? 'Digital download' : `${order.size} print`} — {formatDollars(order.price)}
           </p>
           <div className="mt-6 pt-4 border-t border-border">
             <p className="text-[10px] sm:text-xs text-muted-foreground flex items-center justify-center gap-1">
@@ -198,7 +221,7 @@ export function CheckoutFlow({
             </div>
             <div className="flex justify-between items-center mb-2">
               <span className="text-sm text-muted-foreground">Total</span>
-              <span className="text-sm font-medium text-foreground">${order.price}</span>
+              <span className="text-sm font-medium text-foreground">{formatDollars(order.price)}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Delivery</span>

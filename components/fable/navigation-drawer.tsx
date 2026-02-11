@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { Home, Palette, DollarSign, HelpCircle, FileText, ChevronRight } from 'lucide-react'
+import { Home, Palette, DollarSign, HelpCircle, FileText, ChevronRight, ClipboardList } from 'lucide-react'
 
 interface NavigationDrawerProps {
   open: boolean
@@ -90,6 +90,15 @@ export function NavigationDrawer({ open, onOpenChange }: NavigationDrawerProps) 
             >
               <DollarSign className="h-4 w-4" />
               <span>Pricing</span>
+            </Link>
+
+            <Link
+              href="/orders"
+              onClick={() => onOpenChange(false)}
+              className="flex items-center gap-3 px-3 py-2 text-foreground hover:bg-secondary rounded-lg transition-colors"
+            >
+              <ClipboardList className="h-4 w-4" />
+              <span>My Orders</span>
             </Link>
           </nav>
 

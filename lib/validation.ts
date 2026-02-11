@@ -9,7 +9,7 @@ const emailField = z.string().min(1).refine(
 
 const honeypotField = z.string().max(0).optional().default('')
 
-const turnstileField = z.string().optional()
+const turnstileField = z.string().optional().nullable()
 
 // ── Consent ──
 
@@ -50,6 +50,7 @@ export const checkoutCreateSchema = z.object({
   email: emailField,
   style: z.string().min(1).max(100),
   productId: z.string().min(1).max(100).optional(),
+  jobId: z.number().int().positive().optional(),
   name: z.string().max(100).optional(),
   surname: z.string().max(100).optional(),
   _hp_name: honeypotField,
@@ -92,6 +93,38 @@ export const printOrderSchema = z.object({
     zip: z.string().min(1).max(20),
     email: z.string().email(),
   }),
+})
+
+// ── Support Ticket ──
+
+export const supportTicketSchema = z.object({
+  email: z.string().email({ message: 'Valid email required' }),
+  subject: z.enum(['Payment', 'Quality', 'Order Tracking', 'Other']),
+  message: z.string().min(10, { message: 'Message must be at least 10 characters' }).max(2000),
+  _hp_name: honeypotField,
+  turnstileToken: turnstileField,
+})
+
+// ── Order OTP Request ──
+
+export const orderOtpRequestSchema = z.object({
+  email: z.string().email({ message: 'Valid email required' }),
+  _hp_name: honeypotField,
+  turnstileToken: turnstileField,
+})
+
+// ── Order Lookup ──
+
+export const orderLookupSchema = z.object({
+  email: z.string().email({ message: 'Valid email required' }),
+  code: z.string().length(6, { message: 'OTP must be 6 digits' }),
+})
+
+// ── Order Track (quick lookup without OTP) ──
+
+export const orderTrackSchema = z.object({
+  email: z.string().email({ message: 'Valid email required' }),
+  orderId: z.number().int().positive({ message: 'Valid order ID required' }),
 })
 
 // ── Admin Auth ──

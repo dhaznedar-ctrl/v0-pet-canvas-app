@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 
 declare global {
   interface Window {
@@ -25,9 +25,17 @@ export function TurnstileWidget({ onToken, onExpire }: TurnstileWidgetProps) {
   const widgetIdRef = useRef<string | null>(null)
   const onTokenRef = useRef(onToken)
   const onExpireRef = useRef(onExpire)
+  const [shouldRender, setShouldRender] = useState(false)
 
   onTokenRef.current = onToken
   onExpireRef.current = onExpire
+
+  // Determine if we should render (client-side only to avoid hydration mismatch)
+  useEffect(() => {
+    if (SITE_KEY && window.location.hostname !== 'localhost') {
+      setShouldRender(true)
+    }
+  }, [])
 
   const renderWidget = useCallback(() => {
     if (!containerRef.current || !window.turnstile || !SITE_KEY) return
@@ -43,15 +51,13 @@ export function TurnstileWidget({ onToken, onExpire }: TurnstileWidgetProps) {
   }, [])
 
   useEffect(() => {
-    if (!SITE_KEY) return
+    if (!shouldRender) return
 
-    // If turnstile is already loaded, render immediately
     if (window.turnstile) {
       renderWidget()
       return
     }
 
-    // Load the script
     const existingScript = document.querySelector('script[src*="turnstile"]')
     if (!existingScript) {
       window.onTurnstileLoad = renderWidget
@@ -60,7 +66,6 @@ export function TurnstileWidget({ onToken, onExpire }: TurnstileWidgetProps) {
       script.async = true
       document.head.appendChild(script)
     } else {
-      // Script exists but turnstile not loaded yet — poll briefly
       const poll = setInterval(() => {
         if (window.turnstile) {
           clearInterval(poll)
@@ -76,9 +81,9 @@ export function TurnstileWidget({ onToken, onExpire }: TurnstileWidgetProps) {
         widgetIdRef.current = null
       }
     }
-  }, [renderWidget])
+  }, [shouldRender, renderWidget])
 
-  if (!SITE_KEY) return null
+  if (!shouldRender) return null
 
   return <div ref={containerRef} className="flex justify-center my-2" />
 }
