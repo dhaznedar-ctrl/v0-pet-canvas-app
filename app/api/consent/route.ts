@@ -5,6 +5,7 @@ import { consentSchema, validateWithHoneypot } from '@/lib/validation'
 import { isIPBlocked, logSecurityEvent } from '@/lib/security'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { verifyTurnstile } from '@/lib/turnstile'
+import { addSubscriber } from '@/lib/mailchimp'
 
 const CONSENT_VERSION = 'v1.0'
 
@@ -83,6 +84,9 @@ export async function POST(request: NextRequest) {
 
     // Generate signed API token for subsequent requests
     const authToken = createApiToken(userId, email)
+
+    // Mailchimp: tag as lead (fire-and-forget)
+    addSubscriber(email, ['lead']).catch(console.error)
 
     return NextResponse.json({ success: true, userId, authToken })
   } catch (error) {

@@ -8,6 +8,7 @@ import { getAuthUser, getRequestIP } from '@/lib/api-auth'
 import { generateSchema, validateWithHoneypot } from '@/lib/validation'
 import { isIPBlocked, logSecurityEvent } from '@/lib/security'
 import { verifyTurnstile } from '@/lib/turnstile'
+import { tagSubscriber } from '@/lib/mailchimp'
 
 export async function POST(request: NextRequest) {
   try {
@@ -183,6 +184,11 @@ export async function POST(request: NextRequest) {
 
     // Process job asynchronously (fire-and-forget)
     processJob(jobId, fileUrls, style, editPrompt).catch(console.error)
+
+    // Mailchimp: tag as generated (fire-and-forget)
+    if (email && !email.startsWith('guest-')) {
+      tagSubscriber(email, ['generated']).catch(console.error)
+    }
 
     return NextResponse.json({ jobId, status: 'queued' })
   } catch (error) {

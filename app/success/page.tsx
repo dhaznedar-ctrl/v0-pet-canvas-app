@@ -7,19 +7,25 @@ import { Suspense } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { CheckCircle, Download, Home, Sparkles, Mail, ClipboardList } from 'lucide-react'
+import { trackPurchase } from '@/lib/tracking'
 
 function SuccessContent() {
   const searchParams = useSearchParams()
   const orderId = searchParams.get('orderId')
   const credits = searchParams.get('credits')
 
-  // Clear saved state on mount
+  // Clear saved state on mount and track purchase
   useEffect(() => {
     try {
       localStorage.removeItem('petcanvas_saved_state')
       sessionStorage.clear()
     } catch {}
-  }, [])
+
+    // Track purchase event
+    if (orderId) {
+      trackPurchase(credits ? 39 : 29, 'TRY', orderId)
+    }
+  }, [orderId, credits])
 
   // Credits purchase success
   if (credits) {

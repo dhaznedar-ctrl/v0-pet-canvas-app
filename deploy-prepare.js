@@ -59,9 +59,16 @@ fs.copyFileSync(
 // 5. Copy .env.local if it exists (needed for production env vars)
 const envLocal = path.join(__dirname, '.env.local')
 if (fs.existsSync(envLocal)) {
-  console.log('[5/5] Copying .env.local ...')
+  console.log('[5/6] Copying .env.local ...')
   fs.copyFileSync(envLocal, path.join(standaloneDir, '.env.local'))
 }
 
+// 6. Copy .env.production if it exists (VPS deployment)
+const envProd = path.join(__dirname, '.env.production')
+if (fs.existsSync(envProd)) {
+  console.log('[6/6] Copying .env.production ...')
+  fs.copyFileSync(envProd, path.join(standaloneDir, '.env.production'))
+}
+
 console.log('\n[deploy-prepare] Done! Standalone build ready at .next/standalone/')
-console.log('[deploy-prepare] Upload the contents of .next/standalone/ to your cPanel hosting.')
+console.log('[deploy-prepare] Upload the contents of .next/standalone/ to your hosting.')

@@ -11,6 +11,13 @@ import { Badge } from '@/components/ui/badge'
 import { Lock, RefreshCw, Loader2 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 
+import { DashboardTab } from '@/components/admin/dashboard-tab'
+import { OrdersTab } from '@/components/admin/orders-tab'
+import { UsersTab } from '@/components/admin/users-tab'
+import { SupportTab } from '@/components/admin/support-tab'
+import { BannersTab } from '@/components/admin/banners-tab'
+import { PromptsTab } from '@/components/admin/prompts-tab'
+
 interface Job {
   id: number
   email: string
@@ -37,6 +44,7 @@ export default function AdminPage() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [consents, setConsents] = useState<Consent[]>([])
   const [isLoadingData, setIsLoadingData] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -109,6 +117,11 @@ export default function AdminPage() {
     }
   }
 
+  const handleRefresh = () => {
+    fetchData()
+    setRefreshKey(prev => prev + 1)
+  }
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -147,12 +160,12 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-2xl font-bold text-foreground">Admin Dashboard</h1>
           <Button
             variant="outline"
-            onClick={fetchData}
+            onClick={handleRefresh}
             disabled={isLoadingData}
             className="bg-transparent"
           >
@@ -165,12 +178,34 @@ export default function AdminPage() {
           </Button>
         </div>
 
-        <Tabs defaultValue="jobs" className="space-y-6">
-          <TabsList className="bg-secondary">
+        <Tabs defaultValue="dashboard" className="space-y-6">
+          <TabsList className="bg-secondary flex-wrap h-auto gap-1">
+            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            <TabsTrigger value="orders">Orders</TabsTrigger>
+            <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="jobs">Jobs ({jobs.length})</TabsTrigger>
             <TabsTrigger value="consents">Consents ({consents.length})</TabsTrigger>
+            <TabsTrigger value="support">Support</TabsTrigger>
+            <TabsTrigger value="banners">Banners</TabsTrigger>
+            <TabsTrigger value="prompts">Prompts</TabsTrigger>
           </TabsList>
 
+          {/* Dashboard Tab */}
+          <TabsContent value="dashboard">
+            <DashboardTab key={refreshKey} password={password} />
+          </TabsContent>
+
+          {/* Orders Tab */}
+          <TabsContent value="orders">
+            <OrdersTab key={refreshKey} password={password} />
+          </TabsContent>
+
+          {/* Users Tab */}
+          <TabsContent value="users">
+            <UsersTab key={refreshKey} password={password} />
+          </TabsContent>
+
+          {/* Jobs Tab */}
           <TabsContent value="jobs">
             <Card className="bg-card border-border">
               <CardHeader>
@@ -215,6 +250,7 @@ export default function AdminPage() {
             </Card>
           </TabsContent>
 
+          {/* Consents Tab */}
           <TabsContent value="consents">
             <Card className="bg-card border-border">
               <CardHeader>
@@ -263,6 +299,21 @@ export default function AdminPage() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Support Tab */}
+          <TabsContent value="support">
+            <SupportTab key={refreshKey} password={password} />
+          </TabsContent>
+
+          {/* Banners Tab */}
+          <TabsContent value="banners">
+            <BannersTab key={refreshKey} password={password} />
+          </TabsContent>
+
+          {/* Prompts Tab */}
+          <TabsContent value="prompts">
+            <PromptsTab />
           </TabsContent>
         </Tabs>
       </div>

@@ -25,39 +25,41 @@ const TAB_LABELS: Record<TabCategory, string> = {
 
 const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || ''
 
-/** Tries static thumbnail → R2 auto-generated thumbnail → color palette fallback */
-function StyleThumbnail({ id, name, thumbnail, colors }: { id: string; name: string; thumbnail?: string; colors: string[] }) {
-  const [imgFailed, setImgFailed] = useState(false)
+/** Tries R2 auto-generated thumbnail → static thumbnail → color palette fallback */
+export function StyleThumbnail({ id, name, thumbnail, colors, size = 64 }: { id: string; name: string; thumbnail?: string; colors: string[]; size?: number }) {
+  const [r2Failed, setR2Failed] = useState(false)
+  const [staticFailed, setStaticFailed] = useState(false)
 
-  // Static thumbnail from config
-  if (thumbnail) {
-    return (
-      <Image
-        src={thumbnail}
-        alt={name}
-        width={64}
-        height={64}
-        className="w-full h-full object-cover"
-      />
-    )
-  }
-
-  // Try R2 auto-generated thumbnail
+  // 1. Try R2 auto-generated thumbnail first
   const r2Src = R2_PUBLIC_URL ? `${R2_PUBLIC_URL}/thumbnails/${id}.jpg` : ''
-  if (r2Src && !imgFailed) {
+  if (r2Src && !r2Failed) {
     return (
       <img
         src={r2Src}
         alt={name}
-        width={64}
-        height={64}
+        width={size}
+        height={size}
         className="w-full h-full object-cover"
-        onError={() => setImgFailed(true)}
+        onError={() => setR2Failed(true)}
       />
     )
   }
 
-  // Fallback: color palette
+  // 2. Fallback to static thumbnail from config
+  if (thumbnail && !staticFailed) {
+    return (
+      <Image
+        src={thumbnail}
+        alt={name}
+        width={size}
+        height={size}
+        className="w-full h-full object-cover"
+        onError={() => setStaticFailed(true)}
+      />
+    )
+  }
+
+  // 3. Fallback: color palette
   return (
     <div className="w-full h-full flex items-center justify-center">
       <div className="grid grid-cols-3 gap-0.5 p-2">

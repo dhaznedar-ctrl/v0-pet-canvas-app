@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import { retrieveCheckoutForm } from '@/lib/iyzico'
 import { sendDigitalDownloadEmail } from '@/lib/email'
+import { tagSubscriber } from '@/lib/mailchimp'
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,6 +42,11 @@ export async function POST(request: NextRequest) {
       // Get user email for notifications
       const userRows = await sql`SELECT email FROM users WHERE id = ${order.user_id}`
       const orderEmail = userRows.length > 0 ? userRows[0].email : null
+
+      // Mailchimp: tag as purchaser (fire-and-forget)
+      if (orderEmail) {
+        tagSubscriber(orderEmail, ['purchaser']).catch(console.error)
+      }
 
       // Fulfill credit pack purchases
       if (order.product_id === 'credit-pack-10') {

@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Menu, PawPrint, Gift, Clock, Star, Users, Baby, Smartphone, ThumbsUp, Eye } from 'lucide-react'
+import { Menu, PawPrint, Gift, Clock, Star, Users, Baby, Smartphone, ThumbsUp, Eye, Info, AlertTriangle, Wrench } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { NavigationDrawer } from './navigation-drawer'
@@ -15,21 +15,57 @@ interface TopBarProps {
   hideNav?: boolean
 }
 
+interface BannerData {
+  id: number
+  message: string
+  type: string
+}
+
+const BANNER_STYLES: Record<string, { bg: string; icon: typeof Info }> = {
+  info: { bg: 'bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600', icon: Info },
+  warning: { bg: 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600', icon: AlertTriangle },
+  promo: { bg: 'bg-gradient-to-r from-[#8b5a7c] via-[#a0607a] to-[#8b5a7c]', icon: Gift },
+  maintenance: { bg: 'bg-gradient-to-r from-gray-600 via-gray-500 to-gray-600', icon: Wrench },
+}
+
 export function TopBar({ activeTab, onTabChange, hideNav = false }: TopBarProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [banner, setBanner] = useState<BannerData | null>(null)
+
+  useEffect(() => {
+    fetch('/api/banners')
+      .then(r => r.json())
+      .then(d => { if (d.banner) setBanner(d.banner) })
+      .catch(() => {})
+  }, [])
+
+  const bannerStyle = banner ? BANNER_STYLES[banner.type] || BANNER_STYLES.info : null
+  const BannerIcon = bannerStyle?.icon || Gift
 
   return (
     <>
-      {/* Valentine's Special Banner */}
-      <div className="bg-gradient-to-r from-[#8b5a7c] via-[#a0607a] to-[#8b5a7c] text-white py-1.5 px-2 text-center">
-        <div className="flex items-center justify-center gap-1.5 text-xs sm:text-sm whitespace-nowrap">
-          <Gift className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-          <span>{"Valentine's Special (Pets + Humans)"}</span>
-          <Link href="/?tab=couples" className="font-bold underline hover:no-underline">
-            Try Now
-          </Link>
+      {/* Dynamic Notification Banner */}
+      {banner && bannerStyle && (
+        <div className={cn(bannerStyle.bg, 'text-white py-1.5 px-2 text-center')}>
+          <div className="flex items-center justify-center gap-1.5 text-xs sm:text-sm whitespace-nowrap">
+            <BannerIcon className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+            <span>{banner.message}</span>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Fallback: default promo banner when no dynamic banner */}
+      {!banner && (
+        <div className="bg-gradient-to-r from-[#8b5a7c] via-[#a0607a] to-[#8b5a7c] text-white py-1.5 px-2 text-center">
+          <div className="flex items-center justify-center gap-1.5 text-xs sm:text-sm whitespace-nowrap">
+            <Gift className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+            <span>{"Valentine's Special (Pets + Humans)"}</span>
+            <Link href="/?tab=couples" className="font-bold underline hover:no-underline">
+              Try Now
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Trust Bar */}
       <div className="bg-card text-foreground py-1 px-2 border-b border-border overflow-hidden">

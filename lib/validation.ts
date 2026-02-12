@@ -92,6 +92,7 @@ export const printOrderSchema = z.object({
     countryCode: z.string().min(1).max(100),
     zip: z.string().min(1).max(20),
     email: z.string().email(),
+    phone: z.string().max(30).optional(),
   }),
 })
 

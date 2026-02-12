@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { RefreshCw, Upload, Sparkles, Palette, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
-import Image from 'next/image'
+import useEmblaCarousel from 'embla-carousel-react'
 import { STYLE_PROMPTS, type TabCategory } from '@/lib/style-prompts'
+import { StyleThumbnail } from './style-picker'
 
 interface RetryOptionsModalProps {
   open: boolean
@@ -40,7 +41,30 @@ export function RetryOptionsModal({
   onStyleChange,
 }: RetryOptionsModalProps) {
   const [customDescription, setCustomDescription] = useState('')
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const [emblaRef, emblaApi] = useEmblaCarousel({ align: 'start', slidesToScroll: 3, containScroll: 'trimSnaps' })
+  const [canScrollPrev, setCanScrollPrev] = useState(false)
+  const [canScrollNext, setCanScrollNext] = useState(false)
+  const [selectedSnap, setSelectedSnap] = useState(0)
+  const [snapCount, setSnapCount] = useState(0)
+
+  const onSelect = useCallback(() => {
+    if (!emblaApi) return
+    setCanScrollPrev(emblaApi.canScrollPrev())
+    setCanScrollNext(emblaApi.canScrollNext())
+    setSelectedSnap(emblaApi.selectedScrollSnap())
+    setSnapCount(emblaApi.scrollSnapList().length)
+  }, [emblaApi])
+
+  useEffect(() => {
+    if (!emblaApi) return
+    onSelect()
+    emblaApi.on('select', onSelect)
+    emblaApi.on('reInit', onSelect)
+    return () => {
+      emblaApi.off('select', onSelect)
+      emblaApi.off('reInit', onSelect)
+    }
+  }, [emblaApi, onSelect])
 
   const handleCustomSubmit = () => {
     if (customDescription.trim()) {
@@ -57,15 +81,6 @@ export function RetryOptionsModal({
     })
   }
 
-  const scrollCarousel = (direction: 'left' | 'right') => {
-    if (!scrollRef.current) return
-    const amount = 150
-    scrollRef.current.scrollBy({
-      left: direction === 'left' ? -amount : amount,
-      behavior: 'smooth',
-    })
-  }
-
   // Get themes for the current tab
   const themes = Object.entries(STYLE_PROMPTS)
     .filter(([, config]) => config.tabs.includes(activeTab))
@@ -79,72 +94,90 @@ export function RetryOptionsModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[88vw] max-w-[400px] sm:max-w-[420px] bg-card border-border p-3 sm:p-4 gap-0 max-h-[90vh] overflow-y-auto overflow-x-hidden">
-        {/* Style Picker — compact carousel */}
+        {/* Style Picker — paginated carousel */}
         {onStyleChange && themes.length > 0 && (
           <div className="mb-2 min-w-0">
             <p className="text-[10px] font-medium text-muted-foreground mb-1 flex items-center gap-1">
               <Palette className="h-2.5 w-2.5" />
               Pick a Style
             </p>
-            <div className="relative overflow-hidden">
+            <div className="relative">
               {/* Left arrow */}
-              <button
-                onClick={() => scrollCarousel('left')}
-                className="absolute left-0 top-0 bottom-0 z-10 w-6 flex items-center justify-center bg-gradient-to-r from-card via-card/80 to-transparent"
-              >
-                <ChevronLeft className="h-3 w-3 text-muted-foreground" />
-              </button>
+              {canScrollPrev && (
+                <button
+                  onClick={() => emblaApi?.scrollPrev()}
+                  className="absolute left-0 top-0 bottom-0 z-10 w-6 flex items-center justify-center bg-gradient-to-r from-card via-card/80 to-transparent"
+                >
+                  <ChevronLeft className="h-3 w-3 text-muted-foreground" />
+                </button>
+              )}
               {/* Right arrow */}
-              <button
-                onClick={() => scrollCarousel('right')}
-                className="absolute right-0 top-0 bottom-0 z-10 w-6 flex items-center justify-center bg-gradient-to-l from-card via-card/80 to-transparent"
-              >
-                <ChevronRight className="h-3 w-3 text-muted-foreground" />
-              </button>
+              {canScrollNext && (
+                <button
+                  onClick={() => emblaApi?.scrollNext()}
+                  className="absolute right-0 top-0 bottom-0 z-10 w-6 flex items-center justify-center bg-gradient-to-l from-card via-card/80 to-transparent"
+                >
+                  <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                </button>
+              )}
 
-              <div
-                ref={scrollRef}
-                className="flex gap-1.5 overflow-x-auto scroll-smooth px-6 pb-0.5"
-                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-              >
-                {themes.map((theme) => {
-                  const isIntelligent = theme.id === 'intelligent'
-                  const isSelected = selectedStyle === theme.id || (!selectedStyle && isIntelligent)
-                  return (
-                    <button
-                      key={theme.id}
-                      onClick={() => onStyleChange(theme.id)}
-                      className="flex-shrink-0 flex flex-col items-center gap-px w-[56px]"
-                    >
-                      <div className={`relative w-[52px] h-[52px] rounded-md overflow-hidden flex items-center justify-center transition-all ${
-                        isSelected ? 'ring-2 ring-primary' : 'ring-1 ring-border opacity-50 hover:opacity-100'
-                      } ${isIntelligent ? 'bg-emerald-500/10' : 'bg-secondary'}`}>
-                        {isIntelligent ? (
-                          <Sparkles className="h-3.5 w-3.5 text-emerald-500" />
-                        ) : theme.thumbnail ? (
-                          <Image src={theme.thumbnail} alt={theme.name} width={52} height={52} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="grid grid-cols-3 gap-px p-1">
-                            {theme.colors.slice(0, 6).map((color, i) => (
-                              <div key={i} className="w-2 h-2 rounded-sm" style={{ backgroundColor: color }} />
-                            ))}
+              <div className="overflow-hidden" ref={emblaRef}>
+                <div className="flex">
+                  {themes.map((theme) => {
+                    const isIntelligent = theme.id === 'intelligent'
+                    const isSelected = selectedStyle === theme.id || (!selectedStyle && isIntelligent)
+                    return (
+                      <div key={theme.id} className="flex-[0_0_33.333%] min-w-0 px-1">
+                        <button
+                          onClick={() => onStyleChange(theme.id)}
+                          className="w-full flex flex-col items-center gap-px"
+                        >
+                          <div className={`relative w-full aspect-square rounded-md overflow-hidden flex items-center justify-center transition-all ${
+                            isSelected ? 'ring-2 ring-primary' : 'ring-1 ring-border opacity-50 hover:opacity-100'
+                          } ${isIntelligent ? 'bg-emerald-500/10' : 'bg-secondary'}`}>
+                            {isIntelligent ? (
+                              <Sparkles className="h-3.5 w-3.5 text-emerald-500" />
+                            ) : (
+                              <StyleThumbnail
+                                id={theme.id}
+                                name={theme.name}
+                                thumbnail={theme.thumbnail}
+                                colors={theme.colors}
+                                size={52}
+                              />
+                            )}
+                            {isSelected && (
+                              <div className="absolute top-px right-px bg-primary rounded-full p-px">
+                                <Check className="h-1.5 w-1.5 text-primary-foreground" />
+                              </div>
+                            )}
                           </div>
-                        )}
-                        {isSelected && (
-                          <div className="absolute top-px right-px bg-primary rounded-full p-px">
-                            <Check className="h-1.5 w-1.5 text-primary-foreground" />
-                          </div>
-                        )}
+                          <span className={`text-[8px] leading-tight text-center w-full truncate ${
+                            isSelected ? 'text-foreground font-medium' : 'text-muted-foreground'
+                          }`}>
+                            {theme.name}
+                          </span>
+                        </button>
                       </div>
-                      <span className={`text-[8px] leading-tight text-center w-full truncate ${
-                        isSelected ? 'text-foreground font-medium' : 'text-muted-foreground'
-                      }`}>
-                        {theme.name}
-                      </span>
-                    </button>
-                  )
-                })}
+                    )
+                  })}
+                </div>
               </div>
+
+              {/* Dot indicators */}
+              {snapCount > 1 && (
+                <div className="flex justify-center gap-1 mt-1.5">
+                  {Array.from({ length: snapCount }).map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => emblaApi?.scrollTo(i)}
+                      className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                        i === selectedSnap ? 'bg-primary' : 'bg-border'
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

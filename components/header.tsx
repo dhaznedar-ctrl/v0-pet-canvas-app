@@ -46,6 +46,9 @@ export function Header() {
           <Link href="/support" className="text-foreground/80 hover:text-foreground transition-colors text-sm font-medium">
             Support
           </Link>
+          <Link href="/our-story" className="text-foreground/80 hover:text-foreground transition-colors text-sm font-medium">
+            Our Story
+          </Link>
           <Button asChild className="rounded-full px-6">
             <Link href="/create">Create Portrait</Link>
           </Button>
@@ -85,6 +88,13 @@ export function Header() {
               onClick={() => setMobileMenuOpen(false)}
             >
               Support
+            </Link>
+            <Link
+              href="/our-story"
+              className="text-foreground/80 hover:text-foreground transition-colors py-2 text-sm font-medium"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Our Story
             </Link>
             <Button asChild className="w-full rounded-full">
               <Link href="/create" onClick={() => setMobileMenuOpen(false)}>

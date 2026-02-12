@@ -85,6 +85,17 @@ export interface Credit {
   created_at: Date
 }
 
+export interface NotificationBanner {
+  id: number
+  message: string
+  type: 'info' | 'warning' | 'promo' | 'maintenance'
+  active: boolean
+  starts_at: Date | null
+  ends_at: Date | null
+  created_at: Date
+  updated_at: Date
+}
+
 // Helper to hash IP addresses for GDPR compliance (SHA-256 with salt)
 export function hashIP(ip: string): string {
   const salt = process.env.IP_HASH_SALT || process.env.NEXTAUTH_SECRET || 'petcanvas-default-salt'

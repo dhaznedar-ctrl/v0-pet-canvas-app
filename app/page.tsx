@@ -19,6 +19,7 @@ import { StepsSection } from '@/components/fable/steps-section'
 import { TurnstileWidget } from '@/components/fable/turnstile-widget'
 import { useCurrency } from '@/components/fable/currency-provider'
 import { OnboardingTooltips } from '@/components/fable/onboarding-tooltips'
+import { trackUpload, trackGenerateStart, trackGenerateComplete, trackAddToCart } from '@/lib/tracking'
 
 // Auto-save constants
 const LOCAL_STORAGE_KEY = 'petcanvas_saved_state'
@@ -385,6 +386,7 @@ function HomePageContent() {
 
     setAppState('generating')
     setRemainingGenerations((prev) => Math.max(0, prev - 1))
+    trackGenerateStart()
 
     try {
       // Step 1: Ensure user exists and get auth token
@@ -439,6 +441,8 @@ function HomePageContent() {
         ...photo,
         uploadId: uploadIds[idx] ?? photo.uploadId,
       })))
+
+      trackUpload()
 
       // Step 3: Start generation with all upload IDs
       // Auto-select style based on tab
@@ -505,6 +509,7 @@ function HomePageContent() {
             if (jobData.variations) {
               setVariations(jobData.variations)
             }
+            trackGenerateComplete()
             setAppState('preview')
           } else if (jobData.status === 'failed') {
             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
@@ -642,6 +647,7 @@ function HomePageContent() {
             if (jobData.variations) {
               setVariations(jobData.variations)
             }
+            trackGenerateComplete()
             setAppState('preview')
           } else if (jobData.status === 'failed') {
             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
@@ -760,6 +766,7 @@ function HomePageContent() {
       couples: 'couples-portrait-digital',
       self: 'self-portrait-digital',
     }
+    trackAddToCart(29, 'USD')
     setCurrentOrder({
       type: 'download',
       price: 29,

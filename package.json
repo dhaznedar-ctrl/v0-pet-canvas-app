@@ -18,6 +18,7 @@
     "@fingerprintjs/fingerprintjs": "^5.0.1",
     "@hookform/resolvers": "^3.10.0",
     "@iconify/react": "6.0.2",
+    "@mailchimp/mailchimp_marketing": "^3.0.80",
     "@neondatabase/serverless": "1.0.2",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
@@ -59,6 +60,7 @@
     "next": "16.0.10",
     "next-auth": "^4.24.13",
     "next-themes": "^0.4.6",
+    "posthog-js": "^1.345.5",
     "postman-request": "^2.88.1-postman.48",
     "react": "19.2.0",
     "react-day-picker": "9.8.0",
@@ -80,6 +82,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.9",
+    "@types/mailchimp__mailchimp_marketing": "^3.0.22",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",

@@ -6,6 +6,7 @@ import { getAuthUser, getRequestIP } from '@/lib/api-auth'
 import { printOrderSchema } from '@/lib/validation'
 import { isIPBlocked } from '@/lib/security'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { tagSubscriber } from '@/lib/mailchimp'
 
 export async function POST(request: NextRequest) {
   try {
@@ -87,9 +88,20 @@ export async function POST(request: NextRequest) {
     })
 
     await sql`
-      INSERT INTO print_orders (order_id, job_id, printful_order_id, size, status)
-      VALUES (${orderId}, ${jobId}, ${printOrder.id}, ${size}, ${printOrder.status})
+      INSERT INTO print_orders (
+        order_id, job_id, printful_order_id, size, status,
+        recipient_name, recipient_address1, recipient_city,
+        recipient_state_code, recipient_country_code, recipient_zip, recipient_phone
+      ) VALUES (
+        ${orderId}, ${jobId}, ${printOrder.id}, ${size}, ${printOrder.status},
+        ${recipient?.name || null}, ${recipient?.address1 || null}, ${recipient?.city || null},
+        ${recipient?.stateCode || null}, ${recipient?.countryCode || null},
+        ${recipient?.zip || null}, ${recipient?.phone || null}
+      )
     `
+
+    // Mailchimp: tag as print customer (fire-and-forget)
+    tagSubscriber(email, ['print_customer']).catch(console.error)
 
     await sendPrintOrderConfirmation(email, orderId, 'Canvas Print', size)
 
